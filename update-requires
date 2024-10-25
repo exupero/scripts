@@ -38,9 +38,13 @@
   (->> (namespaces forms)
        (map (fn [nm]
               (let [nmsp (libs nm nm)
-                    [lib version] (first (meta nmsp))]
+                    {:keys [pod] :as m} (meta nmsp)
+                    [lib version] (first (dissoc m :pod))]
                 (cond-> {:namespace nmsp :as nm}
-                  lib (assoc :dep lib :info {:mvn/version version})))))))
+                  pod
+                  , (assoc :pod lib :version version)
+                  (and lib (not pod))
+                  , (assoc :dep lib :info {:mvn/version version})))))))
 
 (comment
   (needed
@@ -73,16 +77,23 @@
 
 (defn new-requires [forms]
   (let [base (needed forms)
-        depd (filter :dep base)]
+        depd (filter :dep base)
+        pods (filter :pod base)]
     {:ns-requires (-> base
-                      (->> (remove :dep))
+                      (->> (remove (some-fn :dep :pod)))
                       (cond-> (seq depd) (conj {:namespace 'babashka.deps :as 'deps}))
+                      (cond-> (seq pods) (conj {:namespace 'babashka.pods :as 'pods}))
                       deps)
      :add-deps (into (sorted-map)
                      (map (fn [{:keys [dep info]}]
                             [dep info]))
                     depd)
-     :requires (->> depd deps)}))
+     :pods (map (fn [{:keys [pod version]}]
+                  [pod version])
+                pods)
+     :requires (->> base
+                    (filter (some-fn :dep :pod))
+                    deps)}))
 
 (comment
   (clojure.pprint/pprint
@@ -126,6 +137,16 @@
             (interpose (n/forms-node [(n/newlines 1) (n/spaces 9)])))
           ns-requires)))
 
+(defn pods-node [pods]
+  (n/forms-node
+    (interpose (n/newlines 1)
+               (for [[nm version] pods]
+                 (n/list-node ['pods/load-pod
+                               (n/spaces 1)
+                               (n/quote-node nm)
+                               (n/spaces 1)
+                               version])))))
+
 (defn add-deps-node [add-deps]
   (n/list-node
     ['deps/add-deps
@@ -151,7 +172,14 @@
               z/remove*)
       loc))
 
-(defn update-requires [loc {:keys [ns-requires add-deps requires]}]
+(defn remove-invocations [loc v]
+  (loop [loc loc]
+    (let [loc' (z/find-value loc z/next v)]
+      (if (or (nil? loc') (= loc loc'))
+        loc
+        (recur (-> loc' z/up z/remove* z/remove*))))))
+
+(defn update-requires [loc {:keys [ns-requires add-deps pods requires]}]
   (-> loc
       find-or-create-ns-require
       z/up
@@ -162,12 +190,18 @@
           (z/insert-right* (add-deps-node add-deps))
           (z/insert-newline-right)
           z/right))
+      (cond-> (seq pods)
+        (->
+          (z/insert-right* (pods-node pods))
+          (z/insert-newline-right)
+          z/right))
       (cond-> (seq requires)
         (->
           (z/insert-right* (require-node requires))
           (z/insert-newline-right)
           z/right))
       (remove-invocation 'deps/add-deps)
+      (remove-invocations 'pods/load-pods)
       (remove-invocation 'require)))
 
 (comment
@@ -175,7 +209,8 @@
                 "(ns my-namespace)\n\n(str/replace)\n(xf/by-key)\n(p/submit)"
                 "(ns my-namespace\n  (:require [clojure.string :as str]))\n\n(str/replace)\n(xf/by-key)\n(portal/submit)"
                 "(ns my-namespace\n  (:require [clojure.string :as str]))\n(deps/add-deps '{:deps {something {}}})\n(require)\n\n(str/replace)\n(xf/by-key)\n(portal/submit)"
-                "(ns my-namespace) (web/launch)"]]
+                "(ns my-namespace)\n(web/launch)"
+                "(ns my-namespace)\n(pods/load-pods)\n(pods/load-pods)\n(sqlite/query)\n(pg/query)"]]
     (-> (z/of-string code)
         (as-> $ (update-requires $ (-> $ z/up z/sexpr new-requires)))
         z/root-string
