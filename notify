@@ -1,0 +1,15 @@
+#!/usr/bin/env obb
+
+(defn parse-args [args]
+  (->> args
+       (partition 2)
+       (map (fn [[k v]]
+              [(keyword (subs k 2)) v]))
+       (into {})))
+
+(let [{:keys [text title subtitle sound]} (parse-args *command-line-args*)
+      app (js/Application.currentApplication)]
+  (set! (.-includeStandardAdditions app) true)
+  (.displayNotification app text #js {:withTitle title
+                                      :subtitle (or subtitle "")
+                                      :soundName (or sound "")}))

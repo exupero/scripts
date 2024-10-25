@@ -1,0 +1,33 @@
+#!/usr/bin/env bb
+
+(ns browse
+  (:require [clojure.java.browse :as browse]
+            [clojure.java.io :as io]
+            [clojure.string :as string]
+            [org.httpkit.server :as server]))
+
+(def static-path
+  (str (.getParent (io/file *file*)) "/static"))
+
+(defn browse-once [html]
+  (let [port (with-open [sock (java.net.ServerSocket. 0)]
+               (.getLocalPort sock))
+        stop? (promise)]
+    (server/run-server
+      (fn [{:keys [uri]}]
+        (cond
+          (re-find #"^/static/.*\.js$" uri)
+          , {:status 200
+             :body (slurp (str static-path (string/replace uri #"^/static" "")))
+             :headers {"Content-type" "application/javascript"}}
+          (= "/" uri)
+          , (do
+              (future
+                (Thread/sleep 1000)
+                (deliver stop? true))
+              {:status 200 :body html})))
+      {:port port})
+    (browse/browse-url (str "http://localhost:" port))
+    @stop?))
+
+(browse-once (slurp *in*))

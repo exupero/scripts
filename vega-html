@@ -1,0 +1,17 @@
+#!/usr/bin/env bb
+
+(ns vega-html
+  (:require [cheshire.core :as json]))
+
+(let [data (json/generate-string (read-string (slurp *in*)) {:pretty true})]
+  (println (format "<html>
+  <head>
+    <script src='/static/vega.js'></script>
+    <script src='/static/vega-lite.js'></script>
+    <script src='/static/vega-embed.js'></script>
+  </head>
+  <body>
+    <div id='vis'></div>
+    <script type='text/javascript'>vegaEmbed('#vis', %s);</script>
+  </body>
+</html>" data)))

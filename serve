@@ -1,0 +1,236 @@
+#!/usr/bin/env bb
+
+(ns serve
+  (:require [clojure.string :as string]
+            [clojure.java.browse :as browse]
+            [babashka.cli :as cli]
+            [babashka.fs :as fs]
+            [org.httpkit.server :as server])
+  (:import [java.net URLDecoder]
+           [java.time Instant]))
+
+;; A simple mime type utility from https://github.com/ring-clojure/ring/blob/master/ring-core/src/ring/util/mime_type.clj
+(def ^{:doc "A map of file extensions to mime-types."}
+  default-mime-types
+  {"7z"       "application/x-7z-compressed"
+   "aac"      "audio/aac"
+   "ai"       "application/postscript"
+   "appcache" "text/cache-manifest"
+   "asc"      "text/plain"
+   "atom"     "application/atom+xml"
+   "avi"      "video/x-msvideo"
+   "bin"      "application/octet-stream"
+   "bmp"      "image/bmp"
+   "bz2"      "application/x-bzip"
+   "class"    "application/octet-stream"
+   "cer"      "application/pkix-cert"
+   "crl"      "application/pkix-crl"
+   "crt"      "application/x-x509-ca-cert"
+   "css"      "text/css"
+   "csv"      "text/csv"
+   "deb"      "application/x-deb"
+   "dart"     "application/dart"
+   "dll"      "application/octet-stream"
+   "dmg"      "application/octet-stream"
+   "dms"      "application/octet-stream"
+   "doc"      "application/msword"
+   "dvi"      "application/x-dvi"
+   "edn"      "application/edn"
+   "eot"      "application/vnd.ms-fontobject"
+   "eps"      "application/postscript"
+   "etx"      "text/x-setext"
+   "exe"      "application/octet-stream"
+   "flv"      "video/x-flv"
+   "flac"     "audio/flac"
+   "gif"      "image/gif"
+   "gz"       "application/gzip"
+   "htm"      "text/html"
+   "html"     "text/html"
+   "ico"      "image/x-icon"
+   "iso"      "application/x-iso9660-image"
+   "jar"      "application/java-archive"
+   "jpe"      "image/jpeg"
+   "jpeg"     "image/jpeg"
+   "jpg"      "image/jpeg"
+   "js"       "text/javascript"
+   "json"     "application/json"
+   "lha"      "application/octet-stream"
+   "lzh"      "application/octet-stream"
+   "mov"      "video/quicktime"
+   "m3u8"     "application/x-mpegurl"
+   "m4v"      "video/mp4"
+   "manifesto" "text/cache-manifest"
+   "mjs"      "text/javascript"
+   "mp3"      "audio/mpeg"
+   "mp4"      "video/mp4"
+   "mpd"      "application/dash+xml"
+   "mpe"      "video/mpeg"
+   "mpeg"     "video/mpeg"
+   "mpg"      "video/mpeg"
+   "oga"      "audio/ogg"
+   "ogg"      "audio/ogg"
+   "ogv"      "video/ogg"
+   "pbm"      "image/x-portable-bitmap"
+   "pdf"      "application/pdf"
+   "pgm"      "image/x-portable-graymap"
+   "png"      "image/png"
+   "pnm"      "image/x-portable-anymap"
+   "ppm"      "image/x-portable-pixmap"
+   "ppt"      "application/vnd.ms-powerpoint"
+   "ps"       "application/postscript"
+   "qt"       "video/quicktime"
+   "rar"      "application/x-rar-compressed"
+   "ras"      "image/x-cmu-raster"
+   "rb"       "text/plain"
+   "rd"       "text/plain"
+   "rss"      "application/rss+xml"
+   "rtf"      "application/rtf"
+   "sgm"      "text/sgml"
+   "sgml"     "text/sgml"
+   "svg"      "image/svg+xml"
+   "swf"      "application/x-shockwave-flash"
+   "tar"      "application/x-tar"
+   "tif"      "image/tiff"
+   "tiff"     "image/tiff"
+   "ts"       "video/mp2t"
+   "ttf"      "font/ttf"
+   "txt"      "text/plain"
+   "webm"     "video/webm"
+   "wmv"      "video/x-ms-wmv"
+   "woff"     "font/woff"
+   "woff2"    "font/woff2"
+   "xbm"      "image/x-xbitmap"
+   "xls"      "application/vnd.ms-excel"
+   "xml"      "text/xml"
+   "xpm"      "image/x-xpixmap"
+   "xwd"      "image/x-xwindowdump"
+   "zip"      "application/zip"})
+
+;; https://github.com/ring-clojure/ring/blob/master/ring-core/src/ring/util/mime_type.clj
+(defn- filename-ext
+  "Returns the file extension of a filename or filepath."
+  [filename]
+  (if-let [ext (second (re-find #"\.([^./\\]+)$" filename))]
+    (string/lower-case ext)))
+
+;; https://github.com/ring-clojure/ring/blob/master/ring-core/src/ring/util/mime_type.clj
+(defn ext-mime-type
+  "Get the mimetype from the filename extension. Takes an optional map of
+  extensions to mimetypes that overrides values in the default-mime-types map."
+  ([filename]
+   (ext-mime-type filename {}))
+  ([filename mime-types]
+   (let [mime-types (merge default-mime-types mime-types)]
+     (mime-types (filename-ext filename)))))
+
+(defn file
+  ([path] (file path identity))
+  ([path body-handler]
+   (let [mime-type (ext-mime-type (fs/file-name path))]
+     {:headers {"Content-Type" mime-type
+                "Access-Control-Allow-Headers" "*"
+                "Access-Control-Allow-Origin" "*"}
+      :body (body-handler (fs/file path))})))
+
+(defn find-file [f]
+  (let [index-file (fs/path f "index.html")]
+    (cond
+      (and (fs/directory? f) (fs/readable? index-file))
+      , index-file
+      (fs/readable? f)
+      , f
+      :else
+      , nil)))
+
+(defn wait-for-update [f interval stop?]
+  (let [cutoff (.toEpochMilli (Instant/now))]
+    (loop []
+      (cond
+        @stop?
+        , false
+        (< cutoff (.lastModified (fs/file f)))
+        , true
+        :else
+        , (do
+            (Thread/sleep (* 1000 interval))
+            (recur))))))
+
+(defn inject-live-reload-js [f]
+  (string/replace-first
+    (slurp f)
+    #"</head>"
+    "<script>
+function longPoll() {
+  fetch(window.location.href + '?on-update')
+    .then(response => response.text())
+    .then(text => {
+      const html = document.createElement('html');
+      html.innerHTML = text;
+      document.body.innerHTML = html.querySelector('body').innerHTML;
+      Array.from(document.body.querySelectorAll('script')).forEach(oldScript => {
+        const newScript = document.createElement('script');
+        Array.from(oldScript.attributes)
+          .forEach(attr => newScript.setAttribute(attr.name, attr.value));
+        newScript.appendChild(document.createTextNode(oldScript.innerHTML));
+        oldScript.parentNode.replaceChild(newScript, oldScript);
+      });
+      Array.from(document.body.querySelectorAll('img')).forEach(img => {
+        const t = new Date().getTime();
+        const i = img.src.indexOf('?');
+        img.src = img.src.substring(0, i > -1 ? i : img.src.length) + '?t=' + t;
+      });
+    })
+    .finally(longPoll);
+}
+longPoll();
+    </script></head>"))
+
+(defn serve [{:keys [dir interval live-reload open port]}]
+  (assert (fs/directory? dir) (str "The given path `" dir "` is not a directory."))
+  (server/run-server
+   (fn [{:keys [uri query-string] :as req}]
+     (let [f (find-file
+               (fs/path dir (string/replace-first (URLDecoder/decode uri) #"^/" "")))
+           stop? (atom false)]
+       (server/as-channel req
+         {:on-close (fn [ch _status]
+                      (reset! stop? true))})
+       (cond
+         (nil? f)
+         , {:status 404 :body (str "Not found `" f "` in " dir)}
+         (some->> query-string (re-find #"on-update"))
+         , (do (wait-for-update f interval stop?)
+               (file f))
+         (and live-reload (= "text/html" (ext-mime-type (fs/file-name f))))
+         , (file f inject-live-reload-js)
+         :else
+         , (file f))))
+   {:port port})
+  (println "Starting HTTP server at" port "for" (str dir))
+  (when open
+    (browse/browse-url (format "http://localhost:%s/%s" port open)))
+  @(promise))
+
+(def cli-opts
+  {:spec {:dir {:desc "directory to serve"
+                :alias :d
+                :coerce :string
+                :default "."}
+          :live-reload {:desc "whether to live reload HTML"
+                        :alias :l
+                        :coerce :boolean
+                        :default false}
+          :open {:desc "path to open a browser to"
+                 :alias :o
+                 :coerce :string}
+          :port {:desc "port to serve on"
+                 :alias :p
+                 :coerce :long}
+          :interval {:desc "seconds between file checks"
+                     :alias :t
+                     :coerce :long
+                     :default 1}}})
+
+(when (= *file* (System/getProperty "babashka.file"))
+  (let [options (cli/parse-opts *command-line-args* cli-opts)]
+    (serve options)))

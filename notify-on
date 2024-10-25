@@ -1,0 +1,22 @@
+#!/usr/bin/env bb
+
+(ns notify-on
+  (:require [clojure.java.io :as io]
+            [clojure.java.shell :as shell]
+            [babashka.cli :as cli]))
+
+(def cli-opts
+  {:spec {:message {:desc "message to show under title of notification"
+                    :alias :m
+                    :coerce :string}
+          :sound {:desc "sound to play with notification"
+                  :alias :s
+                  :coerce :string
+                  :default "tink"}}
+   :args->opts [:pattern]})
+
+(let [{:keys [message pattern sound]} (cli/parse-opts *command-line-args* cli-opts)
+      message (or message pattern)]
+  (doseq [line (line-seq (io/reader *in*))]
+    (when (re-find (re-pattern pattern) line)
+      (shell/sh "notify" "--title" message "--sound" sound))))

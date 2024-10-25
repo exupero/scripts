@@ -1,0 +1,18 @@
+#!/usr/bin/env bb
+
+(ns remove-front-matter
+  (:require [clojure.java.io :as io]
+            [clojure.string :as str]))
+
+(defn remove-front-matter [[head & tail :as lines]]
+  (if (= "---" head)
+    (->> tail
+         (drop-while (complement #{"---"}))
+         (drop 1))
+    lines))
+
+(-> (io/reader *in*)
+    line-seq
+    remove-front-matter
+    (->> (str/join "\n"))
+    println)

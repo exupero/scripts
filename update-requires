@@ -1,0 +1,193 @@
+#!/usr/bin/env bb
+
+(ns update-requires
+  (:require [clojure.string :as str]
+            [rewrite-clj.zip :as z]
+            [rewrite-clj.node :as n]))
+
+(def prune
+  '#{deps/add-deps
+     pods/load-pod})
+
+(def libs (->> (System/getenv "CLJ_IMPORTS_PATH")
+               slurp
+               (format "{%s}")
+               read-string))
+
+(defn pruned-form [form]
+  (if (and (list? form)
+           (prune (first form)))
+    (list (first form))
+    form))
+
+(defn upper-case? [s]
+  (= (str s) (str/upper-case s)))
+
+(defn namespaces [forms]
+  (->> forms
+       (tree-seq coll? pruned-form)
+       (into #{} (comp
+                   (filter (every-pred symbol? namespace))
+                   (map namespace)
+                   (remove (some-fn (comp upper-case? first)
+                                    #(str/starts-with? % "clojure.")
+                                    #(str/starts-with? % "java.")))
+                   (map symbol)))))
+
+(defn needed [forms]
+  (->> (namespaces forms)
+       (map (fn [nm]
+              (let [nmsp (libs nm nm)
+                    [lib version] (first (meta nmsp))]
+                (cond-> {:namespace nmsp :as nm}
+                  lib (assoc :dep lib :info {:mvn/version version})))))))
+
+(comment
+  (needed
+    '[(ns user)
+      (str/replace)
+      (xf/by-key)
+      (some-other-form)]))
+
+(def clojure? #(str/starts-with? % "clojure."))
+(def dotted? #(.contains % "."))
+
+(defn order [a b]
+  (let [a (name a)
+        b (name b)]
+    (cond
+      (and (clojure? a) (not (clojure? b))) , -1
+      (and (not (clojure? a)) (clojure? b)) , 1
+      (and (dotted? a) (not (dotted? b)))   , -1
+      (and (not (dotted? a)) (dotted? b))   , 1
+      :else                                 , (compare a b))))
+
+(defn deps [ds]
+  (->> ds
+       distinct
+       (sort-by :namespace order)
+       (map (fn [{:keys [namespace as]}]
+              (if (and as (not= as namespace))
+                [namespace :as as]
+                namespace)))))
+
+(defn new-requires [forms]
+  (let [base (needed forms)
+        depd (filter :dep base)]
+    {:ns-requires (-> base
+                      (->> (remove :dep))
+                      (cond-> (seq depd) (conj {:namespace 'babashka.deps :as 'deps}))
+                      deps)
+     :add-deps (into (sorted-map)
+                     (map (fn [{:keys [dep info]}]
+                            [dep info]))
+                    depd)
+     :requires (->> depd deps)}))
+
+(comment
+  (clojure.pprint/pprint
+    (new-requires
+      '[(ns user
+          (:refer-clojure :exclude [])
+          (:require [clojure.string :as str] cli)
+          (:import []))
+        (deps/add-deps '{:deps {net.cgrand/xforms {:mvn/version "0.19.6"}
+                                djblue/portal {:mvn/version "0.58.0"}}})
+        (require '[net.cgrand.xforms :as xf]
+                 '[swiss.arrows :refer [-<>]])
+        (some-other-form)
+        (m/match)
+        (portal/submit)
+        (str/replace)])))
+
+(defn find-or-create-ns-require [loc]
+  (let [loc (z/find-value loc z/next 'ns)]
+    (or (-> loc
+            (z/find-value z/next :require))
+        (-> loc
+            z/right
+            (z/insert-right* (n/list-node [:require]))
+            z/right
+            (z/insert-newline-left)
+            (z/insert-space-left 2)
+            z/down))))
+
+(defn ns-require-node [ns-requires]
+  (n/list-node
+    (into [:require (n/spaces 1)]
+          (interpose (n/forms-node [(n/newlines 1) (n/spaces 12)]))
+          ns-requires)))
+
+(defn require-node [ns-requires]
+  (n/list-node
+    (into ['require (n/spaces 1)]
+          (comp
+            (map #(n/quote-node (n/vector-node (interpose (n/spaces 1) %))))
+            (interpose (n/forms-node [(n/newlines 1) (n/spaces 9)])))
+          ns-requires)))
+
+(defn add-deps-node [add-deps]
+  (n/list-node
+    ['deps/add-deps
+     (n/spaces 1)
+     (n/quote-node
+       (n/map-node
+         [(n/keyword-node :deps)
+          (n/spaces 1)
+          (n/map-node
+            (sequence
+              (comp
+                (map (fn [[k v]]
+                       [k (n/spaces 1) v]))
+                (interpose [(n/newlines 1) (n/spaces 24)])
+                (mapcat seq))
+              add-deps))]))]))
+
+(defn remove-invocation [loc v]
+  (or (some-> loc
+              (z/find-value z/next v)
+              z/up
+              z/remove*
+              z/remove*)
+      loc))
+
+(defn update-requires [loc {:keys [ns-requires add-deps requires]}]
+  (-> loc
+      find-or-create-ns-require
+      z/up
+      (z/replace (ns-require-node ns-requires))
+      z/up
+      (cond-> (seq add-deps)
+        (->
+          (z/insert-right* (add-deps-node add-deps))
+          (z/insert-newline-right)
+          z/right))
+      (cond-> (seq requires)
+        (->
+          (z/insert-right* (require-node requires))
+          (z/insert-newline-right)
+          z/right))
+      (remove-invocation 'deps/add-deps)
+      (remove-invocation 'require)))
+
+(comment
+  (doseq [code ["(ns my-namespace)\n\n(str/replace)"
+                "(ns my-namespace)\n\n(str/replace)\n(xf/by-key)\n(p/submit)"
+                "(ns my-namespace\n  (:require [clojure.string :as str]))\n\n(str/replace)\n(xf/by-key)\n(portal/submit)"
+                "(ns my-namespace\n  (:require [clojure.string :as str]))\n(deps/add-deps '{:deps {something {}}})\n(require)\n\n(str/replace)\n(xf/by-key)\n(portal/submit)"
+                "(ns my-namespace) (web/launch)"]]
+    (-> (z/of-string code)
+        (as-> $ (update-requires $ (-> $ z/up z/sexpr new-requires)))
+        z/root-string
+        println)
+    (println "---")))
+
+(defn update-string [code]
+  (-> (z/of-string code)
+      (as-> $ (update-requires $ (-> $ z/up z/sexpr new-requires)))
+      z/root-string))
+
+(when (= *file* (System/getProperty "babashka.file"))
+  (-> (slurp *in*)
+      update-string
+      print))

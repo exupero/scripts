@@ -1,0 +1,16 @@
+#!/usr/bin/env bb
+
+(ns merge-geojson-features
+  (:require [cheshire.core :as json]))
+
+(let [files *command-line-args*]
+  (println
+    (json/generate-string
+      {:type "FeatureCollection"
+       :features (mapcat (fn [path]
+                           (let [{:strs [features]} (-> path slurp json/parse-string)]
+                             (map #(assoc-in % ["properties" :file] path) features)))
+                         files)}
+      {:pretty (json/create-pretty-printer
+                 (assoc json/default-pretty-print-options
+                        :indent-arrays? true))})))
