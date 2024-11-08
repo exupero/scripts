@@ -1,27 +1,16 @@
 #!/usr/bin/env bb
 
 (ns jump-dir
-  (:require [clojure.java.io :as io]
-            config
+  (:require config
             local))
 
 (def dirs (config/read-map :jump-dirs))
 
-(defn find-repo-root []
-  ; Faster than shelling out to `git rev-parse --show-toplevel`?
-  (loop [dir (System/getProperty "user.dir")]
-    (if (.exists (io/file (str dir "/.git")))
-      (io/file dir)
-      (recur (str dir "/..")))))
-
 (when (= *file* (System/getProperty "babashka.file"))
   (let [[target] *command-line-args*]
     (if (nil? target)
-      (print (find-repo-root))
+      (print (str (local/find-repo-root)))
       (if-let [{:keys [tag form]} (dirs (symbol target))]
-        (print
-          (condp = tag
-            'repo (str (find-repo-root) "/" form)
-            (let [f (ns-resolve (find-ns 'local) tag)]
-              (str (f form)))))
+        (let [f (ns-resolve (find-ns 'local) tag)]
+          (print (str (f form))))
         (System/exit 1)))))
