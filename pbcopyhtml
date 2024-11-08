@@ -1,0 +1,4 @@
+#!/bin/bash
+
+hex=$(cat | hexdump -ve '1/1 "%.2x"')
+osascript -e "set the clipboard to «data HTML${hex}»"
