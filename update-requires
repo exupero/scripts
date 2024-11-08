@@ -31,7 +31,6 @@
                    (filter (every-pred symbol? namespace))
                    (map namespace)
                    (remove (some-fn (comp upper-case? first)
-                                    #(str/starts-with? % "clojure.")
                                     #(str/starts-with? % "java.")))
                    (map symbol)))))
 
