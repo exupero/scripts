@@ -18,16 +18,19 @@
         (cond
           (re-find #"^/static/.*\.js$" uri)
           , {:status 200
-             :body (slurp (str static-path (string/replace uri #"^/static" "")))
-             :headers {"Content-type" "application/javascript"}}
+             :headers {"Content-type" "application/javascript"}
+             :body (slurp (str static-path (string/replace uri #"^/static" "")))}
           (= "/" uri)
           , (do
               (future
                 (Thread/sleep 1000)
                 (deliver stop? true))
-              {:status 200 :body html})))
+              {:status 200
+               :headers {"Content-type" "text/html"}
+               :body html})))
       {:port port})
     (browse/browse-url (str "http://localhost:" port))
     @stop?))
 
-(browse-once (slurp *in*))
+(when (= *file* (System/getProperty "babashka.file"))
+  (browse-once (slurp *in*)))
