@@ -1,6 +1,3 @@
-#!/usr/bin/env python
+#!/usr/bin/env bash
 
-import ast
-import sys
-
-print(ast.dump(ast.parse(sys.stdin.read()), indent=2))
+python3.11 -m ast
