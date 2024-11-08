@@ -1,0 +1,13 @@
+#!/usr/bin/env obb
+
+(let [[ks] *command-line-args*
+      system-events (js/Application "System Events")
+      ; Can't get the app name from result of Application.currentApplication(), so we use this instead
+      frontmost-app (-> system-events .-processes
+                        (.whose #js {:frontmost true})
+                        (aget 0)
+                        .name)]
+  (.activate (js/Application "zoom.us"))
+  (doseq [k ks]
+    (.keystroke system-events k #js {:using #js ["command down" "shift down"]}))
+  (.activate (js/Application frontmost-app)))
