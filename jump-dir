@@ -14,12 +14,14 @@
       (io/file dir)
       (recur (str dir "/..")))))
 
-(let [[target] *command-line-args*]
-  (if (nil? target)
-    (print (find-repo-root))
-    (if-let [{:keys [tag form]} (dirs (symbol target))]
-      (print
-        (condp = tag
-          'repo (str (find-repo-root) "/" form)
-          'home (str (local/home form))))
-      (System/exit 1))))
+(when (= *file* (System/getProperty "babashka.file"))
+  (let [[target] *command-line-args*]
+    (if (nil? target)
+      (print (find-repo-root))
+      (if-let [{:keys [tag form]} (dirs (symbol target))]
+        (print
+          (condp = tag
+            'repo (str (find-repo-root) "/" form)
+            (let [f (ns-resolve (find-ns 'local) tag)]
+              (str (f form)))))
+        (System/exit 1)))))
