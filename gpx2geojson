@@ -1,0 +1,40 @@
+#!/usr/bin/env bb
+
+(ns gpx2geojson
+  (:require [clojure.data.xml :as xml]
+            [clojure.java.io :as io]
+            [cheshire.core :as json]))
+
+(let [[n] *command-line-args*
+      n (if n (Integer/parseInt n) 1)]
+  (-> (xml/parse (io/reader System/in))
+    (->>
+      :content
+      (sequence
+        (comp
+          (remove string?)
+          (filter (comp #{"trk"} name :tag))))
+      last
+      :content
+      (sequence
+        (comp
+          (remove string?)
+          (filter (comp #{"trkseg"} name :tag))))
+      (take-last n)
+      (mapcat :content)
+      (sequence
+        (comp
+          (remove string?)
+          (filter (comp #{"trkpt"} name :tag))
+          (map :attrs)
+          (map (fn [{:keys [lat lon]}]
+                 [(Float/parseFloat lon)
+                  (Float/parseFloat lat)])))))
+    (as-> $
+          {:type "FeatureCollection"
+           :features [{:type "Feature"
+                       :properties {}
+                       :geometry {:type "LineString"
+                                  :coordinates $}}]})
+    json/generate-string
+    println))

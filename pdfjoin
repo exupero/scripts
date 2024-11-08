@@ -1,0 +1,24 @@
+#!/usr/bin/env bb
+
+; This could be a Bash script if I knew how to parse and quote Bash arguments properly.
+
+(ns pdfjoin
+  (:require [clojure.java.shell :refer [sh]]
+            [babashka.cli :as cli]))
+
+(def cli-opts
+  {:spec {:output {:desc "the output filename"
+                   :alias :o
+                   :coerce :string}}
+   :args->opts (repeat :sources)})
+
+(let [{:keys [output sources]}
+      , (cli/parse-opts *command-line-args* cli-opts)]
+  (apply sh
+         "/opt/homebrew/bin/gs"
+         "-q"
+         "-dNOPAUSE"
+         "-dBATCH"
+         "-sDEVICE=pdfwrite"
+         (str "-sOutputFile=" output)
+         sources))

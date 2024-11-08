@@ -1,0 +1,4 @@
+#!/bin/bash
+
+branch=$(git rev-parse --abbrev-ref HEAD | tr -d '\n')
+git push -u origin $branch
