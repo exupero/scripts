@@ -34,24 +34,39 @@
                                     #(str/starts-with? % "java.")))
                    (map symbol)))))
 
+(defn symbols [forms]
+  (->> forms
+       (tree-seq coll? pruned-form)
+       (into #{} (filter symbol?))))
+
 (defn needed [forms]
-  (->> (namespaces forms)
-       (map (fn [nm]
-              (let [nmsp (libs nm nm)
-                    {:keys [pod] :as m} (meta nmsp)
-                    [lib version] (first (dissoc m :pod))]
-                (cond-> {:namespace nmsp :as nm}
+  (let [nmsps (namespaces forms)
+        syms (symbols forms)]
+    (keep (fn [[nm nmsp]]
+            (let [{:keys [pod refer] :as m} (meta nmsp)
+                  [[dep version]] (filter (comp symbol? key) m)
+                  referred (seq (filter syms refer))]
+              (when (or (nmsps nm) (nmsps nmsp) referred)
+                (cond-> {:namespace nmsp}
+                  (and (nmsps nm) (not= nm nmsps))
+                  , (assoc :as nm)
+                  referred
+                  , (assoc :refer referred)
                   pod
-                  , (assoc :pod lib :version version)
-                  (and lib (not pod))
-                  , (assoc :dep lib :info {:mvn/version version})))))))
+                  , (assoc :pod dep :version version)
+                  (and dep (not pod))
+                  , (assoc :dep dep :info {:mvn/version version})))))
+          libs)))
 
 (comment
   (needed
     '[(ns user)
       (str/replace)
       (xf/by-key)
-      (some-other-form)]))
+      (some-other-form)
+      (s/-<>)
+      (-<>>)])
+  (needed '[(ns user) (-<>>)]))
 
 (def clojure? #(str/starts-with? % "clojure."))
 (def dotted? #(.contains % "."))
@@ -70,10 +85,12 @@
   (->> ds
        distinct
        (sort-by :namespace order)
-       (map (fn [{:keys [namespace as]}]
-              (if (and as (not= as namespace))
-                [namespace :as as]
-                namespace)))))
+       (map (fn [{:keys [namespace as refer]}]
+              (cond-> [namespace]
+                (and as (not= as namespace))
+                , (conj :as as)
+                refer
+                , (conj :refer (vec refer)))))))
 
 (defn new-requires [forms]
   (let [base (needed forms)
@@ -109,7 +126,8 @@
         (some-other-form)
         (m/match)
         (portal/submit)
-        (str/replace)])))
+        (str/replace)
+        (-<>)])))
 
 (defn find-or-create-ns-require [loc]
   (let [loc (z/find-value loc z/next 'ns)]
@@ -133,14 +151,7 @@
   (n/list-node
     (into ['require (n/spaces 1)]
           (comp
-            (map (fn [node]
-                   (cond
-                     (symbol? node)
-                     , (n/quote-node node)
-                     (vector? node)
-                     , (n/quote-node (n/vector-node (interpose (n/spaces 1) node)))
-                     :else
-                     , (throw (Exception. (str "Unrecognized structure for require: " (pr-str node)))))))
+            (map #(n/quote-node (n/vector-node (interpose (n/spaces 1) %))))
             (interpose (n/forms-node [(n/newlines 1) (n/spaces 9)])))
           ns-requires)))
 
@@ -215,7 +226,8 @@
                 "(ns my-namespace\n  (:require [clojure.string :as str]))\n\n(str/replace)\n(xf/by-key)\n(portal/submit)"
                 "(ns my-namespace\n  (:require [clojure.string :as str]))\n(deps/add-deps '{:deps {something {}}})\n(require)\n\n(str/replace)\n(xf/by-key)\n(portal/submit)"
                 "(ns my-namespace)\n(web/launch)"
-                "(ns my-namespace)\n(pods/load-pods)\n(pods/load-pods)\n(sqlite/query)\n(pg/query)"]]
+                "(ns my-namespace)\n(pods/load-pods)\n(pods/load-pods)\n(sqlite/query)\n(pg/query)"
+                "(ns my-namespace)\n(-<>)"]]
     (-> (z/of-string code)
         (as-> $ (update-requires $ (-> $ z/up z/sexpr new-requires)))
         z/root-string
