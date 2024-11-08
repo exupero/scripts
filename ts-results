@@ -1,0 +1,31 @@
+#!/usr/bin/env bb
+
+(ns ts-results
+  (:require [clojure.java.io :as io]
+            js
+            xforms))
+
+(let [lines (line-seq (io/reader *in*))]
+  (->> lines
+       (sequence
+         (comp
+           (xforms/split-by (partial re-find #"^[^ ]"))
+           (filter second)
+           (mapcat (fn [[path & lines]]
+                     (sequence
+                       (comp
+                         (xforms/split-by (partial re-find #"pattern:"))
+                         (map (fn [[pattern & captures]]
+                                {:path path
+                                 :pattern (some->> pattern (re-find #"\d+") Integer/parseInt)
+                                 :captures (map (fn [capture]
+                                                  (let [[_ idx nm start-row start-col _ _ text :as p]
+                                                        , (re-find #"capture: (?:(\d+) - )?([^ ]+), start: \((\d+), (\d+)\), end: \((\d+), (\d+)\)(?:, text: `(.*)`)?" capture)]
+                                                    {:capture (some-> idx Integer/parseInt)
+                                                     :name nm
+                                                     :line (some-> start-row Integer/parseInt)
+                                                     :column (some-> start-col Integer/parseInt)
+                                                     :text text}))
+                                                captures)})))
+                       lines)))))
+       js/pprint))

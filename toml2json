@@ -1,0 +1,7 @@
+#!/usr/bin/env python3.11
+
+import json
+import sys
+import tomllib
+
+json.dump(tomllib.loads(sys.stdin.read()), sys.stdout)

@@ -1,0 +1,4 @@
+#!/bin/bash
+
+bash -c "$(printf ' %q' "$@")"
+notify --title 'Command finished' --text "$*" --sound frog

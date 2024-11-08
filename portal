@@ -1,0 +1,13 @@
+#!/usr/bin/env bb
+
+(ns portal
+  (:require [babashka.deps :as deps]
+            [cheshire.core :as json]))
+(deps/add-deps '{:deps {djblue/portal {:mvn/version "0.58.0"}}})
+(require '[portal.api :as p])
+
+(let [data (json/parse-string (slurp *in*))]
+  (p/open {:app false})
+  (add-tap #'p/submit)
+  (tap> data)
+  @(promise))

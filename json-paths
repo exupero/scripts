@@ -1,0 +1,3 @@
+#!/bin/bash
+
+jq -c '. as $source | paths | . as $p | $source | [$p, getpath($p)]'

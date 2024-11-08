@@ -1,0 +1,3 @@
+#!/bin/bash
+
+python -c 'import json, sys; print(json.load(sys.stdin))' | ruff format -

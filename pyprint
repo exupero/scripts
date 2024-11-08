@@ -1,0 +1,10 @@
+#!/usr/bin/env python
+
+import pprint
+import sys
+
+for arg in sys.argv[1:]:
+    exec(arg)
+
+data = eval(sys.stdin.read())
+pprint.pprint(data)
