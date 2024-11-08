@@ -14,14 +14,15 @@
                (format "{%s}")
                read-string))
 
+(def upper-case? #(= (str %) (str/upper-case %)))
+(def clojure? #(str/starts-with? % "clojure."))
+(def dotted? #(.contains % "."))
+
 (defn pruned-form [form]
   (if (and (list? form)
            (prune (first form)))
     (list (first form))
     form))
-
-(defn upper-case? [s]
-  (= (str s) (str/upper-case s)))
 
 (defn namespaces [forms]
   (->> forms
@@ -41,22 +42,27 @@
 
 (defn needed [forms]
   (let [nmsps (namespaces forms)
-        syms (symbols forms)]
-    (keep (fn [[nm nmsp]]
-            (let [{:keys [pod refer] :as m} (meta nmsp)
-                  [[dep version]] (filter (comp symbol? key) m)
-                  referred (seq (filter syms refer))]
-              (when (or (nmsps nm) (nmsps nmsp) referred)
-                (cond-> {:namespace nmsp}
-                  (and (nmsps nm) (not= nm nmsps))
-                  , (assoc :as nm)
-                  referred
-                  , (assoc :refer referred)
-                  pod
-                  , (assoc :pod dep :version version)
-                  (and dep (not pod))
-                  , (assoc :dep dep :info {:mvn/version version})))))
-          libs)))
+        syms (symbols forms)
+        known (keep (fn [[nm nmsp]]
+                      (let [{:keys [pod refer] :as m} (meta nmsp)
+                            [[dep version]] (filter (comp symbol? key) m)
+                            referred (seq (filter syms refer))]
+                        (when (or (nmsps nm) (nmsps nmsp) referred)
+                          (cond-> {:namespace nmsp}
+                            (and (nmsps nm) (not= nm nmsps))
+                            , (assoc :as nm)
+                            referred
+                            , (assoc :refer referred)
+                            pod
+                            , (assoc :pod dep :version version)
+                            (and dep (not pod))
+                            , (assoc :dep dep :info {:mvn/version version})))))
+                    libs)
+        assumed (keep (fn [nmsp]
+                        (when-not (libs nmsp)
+                          {:namespace nmsp}))
+                      nmsps)]
+    (concat known assumed)))
 
 (comment
   (needed
@@ -65,11 +71,9 @@
       (xf/by-key)
       (some-other-form)
       (s/-<>)
-      (-<>>)])
+      (-<>>)
+      (http/request)])
   (needed '[(ns user) (-<>>)]))
-
-(def clojure? #(str/starts-with? % "clojure."))
-(def dotted? #(.contains % "."))
 
 (defn order [a b]
   (let [a (name a)
@@ -141,17 +145,24 @@
             (z/insert-space-left 2)
             z/down))))
 
+(defn require-form [node]
+  (if (= 1 (count node))
+    (first node)
+    (n/vector-node (interpose (n/spaces 1) node))))
+
 (defn ns-require-node [ns-requires]
   (n/list-node
     (into [:require (n/spaces 1)]
-          (interpose (n/forms-node [(n/newlines 1) (n/spaces 12)]))
+          (comp
+            (map require-form)
+            (interpose (n/forms-node [(n/newlines 1) (n/spaces 12)])))
           ns-requires)))
 
 (defn require-node [ns-requires]
   (n/list-node
     (into ['require (n/spaces 1)]
           (comp
-            (map #(n/quote-node (n/vector-node (interpose (n/spaces 1) %))))
+            (map #(n/quote-node (require-form %)))
             (interpose (n/forms-node [(n/newlines 1) (n/spaces 9)])))
           ns-requires)))
 
@@ -227,7 +238,8 @@
                 "(ns my-namespace\n  (:require [clojure.string :as str]))\n(deps/add-deps '{:deps {something {}}})\n(require)\n\n(str/replace)\n(xf/by-key)\n(portal/submit)"
                 "(ns my-namespace)\n(web/launch)"
                 "(ns my-namespace)\n(pods/load-pods)\n(pods/load-pods)\n(sqlite/query)\n(pg/query)"
-                "(ns my-namespace)\n(-<>)"]]
+                "(ns my-namespace)\n(-<>)"
+                "(ns my-namespace)\n(http/request)"]]
     (-> (z/of-string code)
         (as-> $ (update-requires $ (-> $ z/up z/sexpr new-requires)))
         z/root-string
