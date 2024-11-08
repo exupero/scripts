@@ -133,7 +133,14 @@
   (n/list-node
     (into ['require (n/spaces 1)]
           (comp
-            (map #(n/quote-node (n/vector-node (interpose (n/spaces 1) %))))
+            (map (fn [node]
+                   (cond
+                     (symbol? node)
+                     , (n/quote-node node)
+                     (vector? node)
+                     , (n/quote-node (n/vector-node (interpose (n/spaces 1) node)))
+                     :else
+                     , (throw (Exception. (str "Unrecognized structure for require: " (pr-str node)))))))
             (interpose (n/forms-node [(n/newlines 1) (n/spaces 9)])))
           ns-requires)))
 
@@ -164,13 +171,11 @@
                 (mapcat seq))
               add-deps))]))]))
 
+(defn attempt [loc f & args]
+  (or (apply f loc args) loc))
+
 (defn remove-invocation [loc v]
-  (or (some-> loc
-              (z/find-value z/next v)
-              z/up
-              z/remove*
-              z/remove*)
-      loc))
+  (attempt loc #(some-> % (z/find-value z/next v) z/up z/remove* z/remove*)))
 
 (defn remove-invocations [loc v]
   (loop [loc loc]
