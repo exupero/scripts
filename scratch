@@ -1,0 +1,22 @@
+#!/usr/bin/env bb
+
+(ns scratch
+  (:require [clojure.java.io :as io]
+            selmer.parser
+            cli
+            config
+            [time :as t]))
+
+(def scratchpad-path (System/getenv "SCRATCHPADS_PATH"))
+
+(cli/with-opts [[[-d --dir scratchpad-path
+                  "directory to create file in; defaults to $SCRATCHPADS_PATH"]
+                 [-t --type "clj" "extension of scratch file; defaults to 'clj'"]]
+                [nmsp]]
+  (let [template (config/content (str "scratch-template-" type ".txt"))
+        file (io/file (or dir scratchpad-path) (str nmsp \. type))]
+    (when-not (.exists file)
+      (spit file (selmer.parser/render template
+                   {:namespace nmsp
+                    :today (t/isoformat-today)})))
+    (print (.getAbsolutePath file))))
