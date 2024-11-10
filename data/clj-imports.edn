@@ -1,0 +1,38 @@
+b ^{backtick/backtick "0.3.5"} backtick
+csk ^{camel-snake-kebab/camel-snake-kebab "0.4.3"} camel-snake-kebab.core
+cske ^{camel-snake-kebab/camel-snake-kebab "0.4.3"} camel-snake-kebab.extras
+clerk nextjournal.clerk
+csv clojure.data.csv
+curl babashka.curl
+deps babashka.deps
+diff ^{lambdaisland/deep-diff2 "2.11.216"} lambdaisland.deep-diff2
+dtf ^{cljc.java-time/cljc.java-time "0.1.21"} cljc.java-time.format.date-time-formatter
+e ^{etaoin/etaoin "1.0.40"} etaoin.api
+ed ^{etaoin/etaoin "1.0.40"} etaoin.dev
+edn clojure.edn
+fipp.edn ^{fipp/fipp "0.6.26"} fipp.edn
+fs babashka.fs
+h ^{com.github.seancorfield/honeysql "2.5.1091"} honey.sql
+io clojure.java.io
+json cheshire.core
+m ^{meander/epsilon "0.0.650"} meander.epsilon
+martian ^{com.github.oliyh/martian "0.1.29"} martian.core
+martian-http ^{com.github.oliyh/martian-babashka-http-client "0.1.29"} martian.babashka.http-client
+m* ^{meander/epsilon "0.0.650"} meander.strategy.epsilon
+md ^{markdown-clj/markdown-clj "1.11.4"} markdown.core
+odt ^{cljc.java-time/cljc.java-time "0.1.21"} cljc.java-time.offset-date-time
+p babashka.process
+pg ^{org.babashka/postgresql "0.1.2"} ^:pod pod.babashka.postgresql
+pods babashka.pods
+portal ^{djblue/portal "0.58.0"} portal.api
+puget ^{mvxcvi/puget "1.3.4"} puget.printer
+rct ^{io.github.matthewdowney/rich-comment-tests "v1.0.3"} com.mjdowney.rich-comment-tests
+s ^{swiss-arrows/swiss-arrows "1.0.0"} ^{:refer [-<> -<>>]} swiss.arrows
+shell clojure.java.shell
+sqlite ^{org.babashka/go-sqlite3 "0.1.0"} ^:pod pod.babashka.go-sqlite3
+str clojure.string
+t time
+tasks babashka.tasks
+walk clojure.walk
+xf ^{net.cgrand/xforms "0.19.6"} net.cgrand.xforms
+z clojure.zip
