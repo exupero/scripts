@@ -35,4 +35,5 @@ t time
 tasks babashka.tasks
 walk clojure.walk
 xf ^{net.cgrand/xforms "0.19.6"} net.cgrand.xforms
+xml clojure.data.xml
 z clojure.zip
