@@ -32,6 +32,7 @@ s ^{swiss-arrows/swiss-arrows "1.0.0"} ^{:refer [-<> -<>>]} swiss.arrows
 shell clojure.java.shell
 sqlite ^{org.babashka/go-sqlite3 "0.1.0"} ^:pod pod.babashka.go-sqlite3
 str clojure.string
+supd ^{vvvvalvalval/supdate "0.2.3"} ^{:refer [supdate]} vvvvalvalval.supdate.api
 t time
 tasks babashka.tasks
 walk clojure.walk
