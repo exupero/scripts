@@ -14,6 +14,7 @@ edn clojure.edn
 fipp.edn ^{fipp/fipp "0.6.26"} fipp.edn
 fs babashka.fs
 h ^{com.github.seancorfield/honeysql "2.5.1091"} honey.sql
+hiccup hiccup2.core
 io clojure.java.io
 json cheshire.core
 m ^{meander/epsilon "0.0.650"} meander.epsilon
