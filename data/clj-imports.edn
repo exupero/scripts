@@ -22,6 +22,7 @@ logic ^{org.clojure/core.logic "1.1.0"} ^{:refer [== fresh project run*]} clojur
 m ^{meander/epsilon "0.0.650"} meander.epsilon
 martian ^{com.github.oliyh/martian "0.1.29"} martian.core
 martian-http ^{com.github.oliyh/martian-babashka-http-client "0.1.29"} martian.babashka.http-client
+match ^{:refer [match]} clojure.core.match
 m* ^{meander/epsilon "0.0.650"} meander.strategy.epsilon
 md ^{markdown-clj/markdown-clj "1.11.4"} markdown.core
 odt ^{com.widdindustries/cljc.java-time "0.1.21"} cljc.java-time.offset-date-time
