@@ -27,9 +27,10 @@
             (println (.getAbsolutePath repo))
             (p/shell {:dir repo} "git -c color.ui=always status --short")
             (when-not preview
-              @(p/shell {:dir repo
-                         :extra-env {"PROMPT_OVERRIDE" (str "Staging changes in " repo "; 'exit' or C-d when done\n> ")}}
-                        "zsh")
-              (p/shell {:dir repo} "git commit -m 'Check in'")
+              (p/shell {:dir repo
+                        :extra-env {"PROMPT_OVERRIDE" (str "Staging changes in " repo "; 'exit' or C-d when done\n> ")}
+                        :continue true}
+                       "zsh")
+              (p/shell {:dir repo :continue true} "git commit -m 'Check in'")
               (when (git/origin repo)
                 (p/shell {:dir repo} "git push -u origin")))))))))
