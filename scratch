@@ -9,12 +9,14 @@
 
 (def scratchpad-path (System/getenv "SCRATCHPADS_PATH"))
 
-(cli/with-opts [[[-d --dir scratchpad-path
-                  "directory to create file in; defaults to $SCRATCHPADS_PATH"]
+(cli/with-opts [[[-d --dir scratchpad-path "directory to create file in; defaults to $SCRATCHPADS_PATH"]
+                 [-E --no-extension "don't create the file with an extension"]
                  [-t --type "clj" "extension of scratch file; defaults to 'clj'"]]
                 [nmsp]]
   (let [template (config/content (str "scratch-template-" type ".txt"))
-        file (io/file (or dir scratchpad-path) (str nmsp \. type))]
+        file (io/file (or dir scratchpad-path)
+                      (cond-> (str nmsp)
+                        (not no-extension) (str \. type)))]
     (when-not (.exists file)
       (spit file (selmer.parser/render template
                    {:namespace nmsp
