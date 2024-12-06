@@ -1,0 +1,16 @@
+#!/usr/bin/env python
+
+import ast
+import sys
+
+from hy.compiler import hy_compile
+from hy.importer import read_many
+
+def process(tree):
+    return ast.Module(
+        body=[node for node in tree.body
+              if not (isinstance(node, ast.Import) and any(alias.name == "hy" for alias in node.names))],
+        type_ignores=[])
+
+if __name__ == "__main__":
+    print(ast.unparse(process(hy_compile(read_many(sys.stdin.read()), "__main__"))))
