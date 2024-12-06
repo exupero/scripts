@@ -22,7 +22,9 @@
       (if-not (.exists repo)
         (println "repo" repo "does not exist")
         (if check-out
-          (p/shell {:dir repo} "git pull")
+          (do
+            (println (.getAbsolutePath repo))
+            (p/shell {:dir repo :continue true} "git pull"))
           (when (git/changes? repo)
             (println (.getAbsolutePath repo))
             (p/shell {:dir repo} "git -c color.ui=always status --short")
