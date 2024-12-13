@@ -18,6 +18,7 @@ h ^{com.github.seancorfield/honeysql "2.5.1091"} honey.sql
 hiccup hiccup2.core
 io clojure.java.io
 json cheshire.core
+ld ^{com.widdindustries/cljc.java-time "0.1.21"} cljc.java-time.local-date
 logic ^{org.clojure/core.logic "1.1.0"} ^{:refer [== fresh project run*]} clojure.core.logic
 m ^{meander/epsilon "0.0.650"} meander.epsilon
 martian ^{com.github.oliyh/martian "0.1.29"} martian.core
