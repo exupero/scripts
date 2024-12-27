@@ -4,7 +4,6 @@ c ^{clojure-term-colors/clojure-term-colors "0.1.0"} clojure.term.colors
 csk ^{camel-snake-kebab/camel-snake-kebab "0.4.3"} camel-snake-kebab.core
 cske ^{camel-snake-kebab/camel-snake-kebab "0.4.3"} camel-snake-kebab.extras
 clerk nextjournal.clerk
-cli babashka.cli
 csv clojure.data.csv
 curl babashka.curl
 deps babashka.deps
