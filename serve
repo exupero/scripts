@@ -1,13 +1,18 @@
 #!/usr/bin/env bb
 
-(ns serve
-  (:require [clojure.string :as string]
-            [clojure.java.browse :as browse]
+(ns server
+  (:require clojure.java.browse
+            [clojure.string :as str]
             [babashka.cli :as cli]
             [babashka.fs :as fs]
+            [babashka.pods :as pods]
             [org.httpkit.server :as server])
-  (:import [java.net URLDecoder]
-           [java.time Instant]))
+  (:import [java.net URLDecoder]))
+(pods/load-pod 'org.babashka/fswatcher "0.0.5")
+(require '[pod.babashka.fswatcher :as fw])
+(pods/load-pod 'org.babashka/fswatcher "0.0.5")
+(pods/load-pod 'org.babashka/fswatcher "0.0.5")
+(pods/load-pod 'org.babashka/fswatcher "0.0.5")
 
 ;; A simple mime type utility from https://github.com/ring-clojure/ring/blob/master/ring-core/src/ring/util/mime_type.clj
 (def ^{:doc "A map of file extensions to mime-types."}
@@ -110,8 +115,8 @@
 (defn- filename-ext
   "Returns the file extension of a filename or filepath."
   [filename]
-  (if-let [ext (second (re-find #"\.([^./\\]+)$" filename))]
-    (string/lower-case ext)))
+  (when-let [ext (second (re-find #"\.([^./\\]+)$" filename))]
+    (str/lower-case ext)))
 
 ;; https://github.com/ring-clojure/ring/blob/master/ring-core/src/ring/util/mime_type.clj
 (defn ext-mime-type
@@ -123,13 +128,14 @@
    (let [mime-types (merge default-mime-types mime-types)]
      (mime-types (filename-ext filename)))))
 
-(defn file
-  ([path] (file path identity))
+(defn not-found [f dir]
+  {:status 404 :body (str "Not found `" f "` in " dir)})
+
+(defn body
+  ([path] (body path identity))
   ([path body-handler]
    (let [mime-type (ext-mime-type (fs/file-name path))]
-     {:headers {"Content-Type" mime-type
-                "Access-Control-Allow-Headers" "*"
-                "Access-Control-Allow-Origin" "*"}
+     {:headers {"Content-Type" mime-type}
       :body (body-handler (fs/file path))})))
 
 (defn find-file [f]
@@ -142,74 +148,94 @@
       :else
       , nil)))
 
-(defn wait-for-update [f interval stop?]
-  (let [cutoff (.toEpochMilli (Instant/now))]
-    (loop []
-      (cond
-        @stop?
-        , false
-        (< cutoff (.lastModified (fs/file f)))
-        , true
-        :else
-        , (do
-            (Thread/sleep (* 1000 interval))
-            (recur))))))
-
 (defn inject-live-reload-js [f]
-  (string/replace-first
-    (slurp f)
-    #"</head>"
-    "<script>
-function longPoll() {
-  fetch(window.location.href + '?on-update')
-    .then(response => response.text())
-    .then(text => {
-      const html = document.createElement('html');
-      html.innerHTML = text;
-      document.body.innerHTML = html.querySelector('body').innerHTML;
-      Array.from(document.body.querySelectorAll('script')).forEach(oldScript => {
-        const newScript = document.createElement('script');
-        Array.from(oldScript.attributes)
-          .forEach(attr => newScript.setAttribute(attr.name, attr.value));
-        newScript.appendChild(document.createTextNode(oldScript.innerHTML));
-        oldScript.parentNode.replaceChild(newScript, oldScript);
-      });
-      Array.from(document.body.querySelectorAll('img')).forEach(img => {
-        const t = new Date().getTime();
-        const i = img.src.indexOf('?');
-        img.src = img.src.substring(0, i > -1 ? i : img.src.length) + '?t=' + t;
-      });
-    })
-    .finally(longPoll);
+  (str/replace (slurp f) #"</head>" "<script>
+function resetHtml(content) {
+  const html = document.createElement('html');
+  html.innerHTML = content;
+  document.body.innerHTML = html.querySelector('body').innerHTML;
+  Array.from(document.body.querySelectorAll('script')).forEach(oldScript => {
+    const newScript = document.createElement('script');
+    Array.from(oldScript.attributes)
+      .forEach(attr => newScript.setAttribute(attr.name, attr.value));
+    newScript.appendChild(document.createTextNode(oldScript.innerHTML));
+    oldScript.parentNode.replaceChild(newScript, oldScript);
+  });
+  Array.from(document.body.querySelectorAll('img')).forEach(img => {
+    const t = new Date().getTime();
+    const i = img.src.indexOf('?');
+    img.src = img.src.substring(0, i > -1 ? i : img.src.length) + '?t=' + t;
+  });
 }
-longPoll();
-    </script></head>"))
+function listenOnWebsocket() {
+  const listen = () => {
+    const conn = new WebSocket(`ws://\\${window.location.host}\\${window.location.pathname}`);
+    conn.onopen = () => console.log(`Socket connected to server`);
+    conn.onclose = () => {
+      console.warn(`Socket to server closed; retrying...`);
+      setTimeout(listen, 3000);
+    };
+    conn.onmessage = (e) => {
+      console.log('Reloading');
+      resetHtml(e.data);
+    }
+  }
+  listen();
+}
+listenOnWebsocket();
+                                    </script></head>"))
 
-(defn serve [{:keys [dir interval live-reload open port]}]
+(def path->channels (atom {}))
+
+(defn on-open [ch path]
+  (swap! path->channels update path (fnil conj #{}) ch))
+
+(defn on-receive [ch msg]
+  (println "Received data on" ch ":" (pr-str msg)))
+
+(defn on-close [ch _]
+  (swap! path->channels (partial into {} (map #(disj % ch)))))
+
+(defn watch [dir]
+  (fw/watch dir
+    (fn [{:keys [path]}]
+      (when-not (str/ends-with? path "~")
+        (println "Changes to" (str path))
+        (let [k (-> path
+                    (str/replace (re-pattern (str "^" dir)) "")
+                    (str/replace #"/(index\.html)?$" ""))
+              content (slurp path)]
+          (doseq [ch (@path->channels k)]
+            (server/send! ch content)))))
+    {:recursive true}))
+
+(defn serve [{:keys [port dir open]}]
   (assert (fs/directory? dir) (str "The given path `" dir "` is not a directory."))
-  (server/run-server
-   (fn [{:keys [uri query-string] :as req}]
-     (let [f (find-file
-               (fs/path dir (string/replace-first (URLDecoder/decode uri) #"^/" "")))
-           stop? (atom false)]
-       (server/as-channel req
-         {:on-close (fn [ch _status]
-                      (reset! stop? true))})
-       (cond
-         (nil? f)
-         , {:status 404 :body (str "Not found `" f "` in " dir)}
-         (some->> query-string (re-find #"on-update"))
-         , (do (wait-for-update f interval stop?)
-               (file f))
-         (and live-reload (= "text/html" (ext-mime-type (fs/file-name f))))
-         , (file f inject-live-reload-js)
-         :else
-         , (file f))))
-   {:port port})
-  (println "Starting HTTP server at" port "for" (str dir))
-  (when open
-    (browse/browse-url (format "http://localhost:%s/%s" port open)))
-  @(promise))
+  (let [watcher (watch dir)]
+    (server/run-server
+     (fn [{:keys [uri websocket?] :as req}]
+       (if websocket?
+         (let [path (str/replace uri #"/(index\.html)?$" "")]
+           (server/as-channel req {:on-open #(on-open % path)
+                                   :on-receive on-receive
+                                   :on-close on-close}))
+         (let [f (find-file
+                   (fs/path dir (str/replace-first (URLDecoder/decode uri) #"^/" "")))]
+           (cond
+             (nil? f)
+             , (not-found f dir)
+             (-> f fs/file-name ext-mime-type (= "text/html"))
+             , (body f inject-live-reload-js)
+             :else
+             , (body f)))))
+     {:port port})
+    (println "Starting HTTP server at" port "for" (str dir))
+    (when open
+      (clojure.java.browse/browse-url (format "http://localhost:%s/" port)))
+    (try
+      @(promise)
+      (finally
+        (fw/unwatch watcher)))))
 
 (def cli-opts
   {:spec {:dir {:desc "directory to serve"

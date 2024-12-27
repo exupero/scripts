@@ -4,6 +4,7 @@ c ^{clojure-term-colors/clojure-term-colors "0.1.0"} clojure.term.colors
 csk ^{camel-snake-kebab/camel-snake-kebab "0.4.3"} camel-snake-kebab.core
 cske ^{camel-snake-kebab/camel-snake-kebab "0.4.3"} camel-snake-kebab.extras
 clerk nextjournal.clerk
+cli babashka.cli
 csv clojure.data.csv
 curl babashka.curl
 deps babashka.deps
@@ -14,6 +15,7 @@ ed ^{etaoin/etaoin "1.0.40"} etaoin.dev
 edn clojure.edn
 fipp.edn ^{fipp/fipp "0.6.26"} fipp.edn
 fs babashka.fs
+fw ^{org.babashka/fswatcher "0.0.5"} ^:pod pod.babashka.fswatcher
 h ^{com.github.seancorfield/honeysql "2.5.1091"} honey.sql
 hiccup hiccup2.core
 io clojure.java.io
@@ -34,6 +36,7 @@ portal ^{djblue/portal "0.58.0"} portal.api
 puget ^{mvxcvi/puget "1.3.4"} puget.printer
 rct ^{io.github.matthewdowney/rich-comment-tests "v1.0.3"} com.mjdowney.rich-comment-tests
 s ^{swiss-arrows/swiss-arrows "1.0.0"} ^{:refer [-<> -<>>]} swiss.arrows
+server org.httpkit.server
 shell clojure.java.shell
 sqlite ^{org.babashka/go-sqlite3 "0.1.0"} ^:pod pod.babashka.go-sqlite3
 stash ^{rorokimdim/stash "0.3.4"} ^:pod pod.rorokimdim.stash
