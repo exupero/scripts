@@ -135,7 +135,8 @@
   ([path] (body path identity))
   ([path body-handler]
    (let [mime-type (ext-mime-type (fs/file-name path))]
-     {:headers {"Content-Type" mime-type}
+     {:headers {"Content-Type" mime-type
+                "Access-Control-Allow-Origin" "*"}
       :body (body-handler (fs/file path))})))
 
 (defn find-file [f]
