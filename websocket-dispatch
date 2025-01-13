@@ -1,0 +1,65 @@
+#!/usr/bin/env bb
+
+(ns websocket-hub
+  (:require [org.httpkit.server :as server]
+            [cheshire.core :as json]
+            cli
+            util))
+
+(def channels (atom #{}))
+
+(def responses (atom {}))
+
+(defn on-open [ch]
+  (swap! channels conj ch))
+
+(defn on-close [ch status]
+  (swap! channels disj ch))
+
+(defn on-receive [ch msg]
+  (let [msg (json/parse-string msg true)]
+    (swap! responses assoc (java.util.UUID/fromString (msg :id)) msg)))
+
+(defn broadcast! [msg]
+  (let [ids (volatile! #{})]
+    (doseq [ch @channels
+            :let [id (java.util.UUID/randomUUID)]]
+      (vswap! ids conj id)
+      (server/send! ch (json/generate-string (assoc msg :id (str id)))))
+    @ids))
+
+(defn get-message-by-id [id]
+  (loop [i 0]
+    (if (< i 100)
+      (if-let [response (@responses id)]
+        (do
+          (swap! responses dissoc id)
+          response)
+        (do
+          (Thread/sleep 100)
+          (recur (inc i))))
+      (throw (Exception. (str "Did not receive message for ID " id))))))
+
+(defn get-messages-by-ids [ids]
+  (into {}
+        (map (juxt identity get-message-by-id))
+        ids))
+
+(defn handler [req]
+  (if (req :websocket?)
+    (server/as-channel req {:on-open on-open
+                            :on-receive on-receive
+                            :on-close on-close})
+    (let [ids (broadcast! {:type :eval, :code (slurp (req :body))})]
+      {:status 200
+       :headers {"content-type" "text/clojure"}
+       :body (-> (get-messages-by-ids ids)
+                 vals
+                 (->> (mapv :result))
+                 pr-str)})))
+
+(cli/with-opts [[]
+                [port]]
+  (server/run-server handler {:port port})
+  (println "Starting server on port" port)
+  @(promise))
