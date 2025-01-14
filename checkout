@@ -1,13 +1,13 @@
 #!/usr/bin/env bb
 
-(ns checkin
+(ns checkout
   (:require [clojure.java.io :as io]
             [clojure.string :as str]
             [babashka.process :as p]
             cli
             git))
 
-(cli/with-opts [[[-p --preview "don't check in, instead show repo status"]]
+(cli/with-opts [[]
                 [env-var-suffix]]
   (let [env-var-name (cond-> "CHECKIN_PATHS"
                        env-var-suffix (str \_ (str/upper-case env-var-suffix)))
@@ -20,14 +20,6 @@
     (doseq [repo repos]
       (if-not (.exists repo)
         (println "repo" repo "does not exist")
-        (when (git/changes? repo)
+        (do
           (println (.getAbsolutePath repo))
-          (p/shell {:dir repo} "git -c color.ui=always status --short")
-          (when-not preview
-            (p/shell {:dir repo
-                      :extra-env {"PROMPT_OVERRIDE" (str "Staging changes in " repo "; 'exit' or C-d when done\n> ")}
-                      :continue true}
-                     "zsh")
-            (p/shell {:dir repo :continue true} "git commit -m 'Check in'")
-            (when (git/origin repo)
-              (p/shell {:dir repo :continue true} "git push -u origin"))))))))
+          (p/shell {:dir repo :continue true} "git pull"))))))
