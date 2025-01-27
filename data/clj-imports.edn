@@ -10,6 +10,7 @@ deps babashka.deps
 diff ^{lambdaisland/deep-diff2 "2.11.216"} lambdaisland.deep-diff2
 dtf ^{com.widdindustries/cljc.java-time "0.1.21"} cljc.java-time.format.date-time-formatter
 e ^{etaoin/etaoin "1.0.40"} etaoin.api
+e.dev ^{etaoin/etaoin "1.0.40"} etaoin.dev
 ed ^{etaoin/etaoin "1.0.40"} etaoin.dev
 edn clojure.edn
 fipp.edn ^{fipp/fipp "0.6.26"} fipp.edn
