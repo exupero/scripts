@@ -13,3 +13,4 @@
   (.displayNotification app text #js {:withTitle title
                                       :subtitle (or subtitle "")
                                       :soundName (or sound "")}))
+; For list of sound options, `ls /System/Library/Sounds`
