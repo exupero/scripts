@@ -1,0 +1,16 @@
+#!/bin/bash
+
+osascript -e "the clipboard as record" | python <(cat <<EOF
+import binascii
+import re
+import sys
+
+def decode(data):
+    match = re.search(r'«class HTML»:«data HTML([0-9A-Fa-f\s]+)»', data, re.DOTALL)
+    if not match:
+        return None
+    return binascii.unhexlify(match[1]).decode('utf-8')
+
+print(decode(sys.stdin.read()))
+EOF
+)
