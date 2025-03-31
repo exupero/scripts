@@ -1,0 +1,132 @@
+#!/usr/bin/env bb
+
+(ns speedwords
+  (:require [clojure.java.io :as io]
+            clojure.pprint
+            [clojure.string :as str]
+            cli
+            local))
+
+(def full-dict
+  (-> (io/file (System/getProperty "babashka.file"))
+      .getParent
+      (str "/data/speedwords.txt")
+      io/reader
+      line-seq
+      (->> (sequence
+             (comp
+               (remove (partial re-find #"^#"))
+               (remove str/blank?)
+               (map #(str/split % #"\t" 2))
+               (map (fn [[speedword meaning]]
+                      (cond
+                        ; prefixes
+                        (str/ends-with? speedword "-")
+                        , {:prefix speedword
+                           :meaning meaning}
+                        ; suffixes
+                        (str/starts-with? speedword "-")
+                        , {:suffix speedword
+                           :meaning meaning}
+                        :else
+                        , {:radical (re-find #"^[A-Za-z()]+" speedword)
+                           :suffixes (re-seq #"-[A-Za-z()]+" speedword)
+                           :speedword (str/replace speedword #"-" "")
+                           :english (-> meaning
+                                        (str/replace #"\([^(]+\)" "")
+                                        (str/split #","))
+                           :clarification (some->> meaning (re-find #"\((.*)\)") second)}))))))))
+
+(def prefixes
+  (into {}
+        (comp
+          (filter :prefix)
+          (map (juxt :prefix :meaning)))
+        full-dict))
+
+(def suffixes
+  (into {}
+        (comp
+          (filter :suffix)
+          (map (juxt :suffix :meaning)))
+        full-dict))
+
+(def radicals
+  (into {}
+        (comp
+          (filter :radical)
+          (remove (comp seq :suffixes))
+          (map (juxt :radical (juxt :english :clarification))))
+        full-dict))
+
+(def dict (filter :radical full-dict))
+
+(def speedword->english
+  (into {}
+        (comp
+          (filter :radical)
+          (remove (comp seq :suffixes))
+          (map (juxt :radical identity)))
+        dict))
+
+(def english->speedwords
+  (->> dict
+       (sequence
+         (comp
+           (filter :radical)
+           (mapcat (fn [entry]
+                     (->> (entry :english)
+                          (map #(do [% entry])))))))
+       (group-by first)
+       (into {}
+             (map (fn [[k vs]]
+                    [k (->> vs
+                            (map second)
+                            (sort-by (comp count :speedword)))])))))
+
+(defn combos [xs & xss]
+  (if (empty? xss)
+    (map list xs)
+    (for [x xs
+          ys (apply combos xss)]
+      (cons x ys))))
+
+(defn breakdown [{sufs :suffixes :keys [speedword radical english clarification]}]
+  (cond
+    (nil? radical)
+    , speedword
+    (seq sufs)
+    , (let [lookup #(->> % speedword->english :english (str/join ", "))]
+        (str "[" speedword ": " (str/join ", " english)
+             (cond-> "" clarification (str " (" clarification ")"))
+             " = " radical "/" (lookup radical)
+             (cond-> "" (seq sufs)
+               (str " + " (str/join " + "
+                                    (map (fn [suffix]
+                                           (str suffix "/"
+                                                (or (suffixes suffix)
+                                                    (-> suffix (subs 1) lookup))))
+                                         sufs))))
+             "]"))
+    :else
+    , (str "[" speedword ": " (str/join ", " english) "]")))
+
+(defn same-capitalization [entries style]
+  (if (Character/isUpperCase (first style))
+    (map #(update % :speedword str/capitalize) entries)
+    entries))
+
+(cli/with-opts [[]
+                [phrase]]
+  (let [c (count (re-seq #"\w" phrase))
+        words (-> phrase
+                  (str/split #"\s+")
+                  (->> (map #(-> % str/lower-case (english->speedwords [{:speedword %}]) (same-capitalization %)))))]
+    (doseq [combo (apply combos words)
+            :let [len (transduce
+                        (map (comp count #(str/replace % #"\{[^}]+\}" "") :speedword))
+                        + 0 combo)]]
+      (println
+        (->> combo (map :speedword) (str/join " "))
+        (->> combo (map breakdown) (str/join " "))
+        (str "(" len "/" c " " (Math/round (* 100 (float (/ len c)))) "%)")))))
