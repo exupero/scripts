@@ -121,7 +121,12 @@
   (let [c (count (re-seq #"\w" phrase))
         words (-> phrase
                   (str/split #"\s+")
-                  (->> (map #(-> % str/lower-case (english->speedwords [{:speedword %}]) (same-capitalization %)))))]
+                  (->> (map (fn [word]
+                              (same-capitalization
+                                (or (english->speedwords word)
+                                    (english->speedwords (str/lower-case word))
+                                    [{:speedword word}])
+                                word)))))]
     (doseq [combo (apply combos words)
             :let [len (transduce
                         (map (comp count #(str/replace % #"\{[^}]+\}" "") :speedword))
