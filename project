@@ -1,0 +1,37 @@
+#!/usr/bin/env bb
+
+(ns project
+  (:require [clojure.string :as str]
+            cli
+            util))
+
+(defn time? [x]
+  (and (string? x)
+       (re-matches #"\d+:\d+" x)))
+
+(defn parse-arg [x]
+  (cond
+    (number? x) x
+    (time? x)   (let [[h m] (map parse-long (str/split x #":" 2))]
+                  (+ m (* 60 h)))
+    :else       (util/abort (str "Unrecognized argument '" x "'"))))
+
+(defn linear [[x1 x2] [y1 y2]]
+  (let [m (/ (- y1 y2) (- x1 x2))
+        b (- y1 (* m x1))]
+    #(+ b (* m %))))
+
+(defn as-time [x]
+  (let [h (int (/ x 60))
+        m (int (mod x 60))]
+    (str h ":" (format "%02d" m))))
+
+(cli/with-opts [[]
+                [& args]]
+  (let [[_ _ y1-raw] args
+        [x1 x2 y1 y2 x] (map parse-arg args)
+        f (linear [x1 x2] [y1 y2])
+        y (f x)]
+    (if (time? y1-raw)
+      (println (as-time y))
+      (println (float y)))))

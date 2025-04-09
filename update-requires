@@ -8,6 +8,7 @@
 (def prune
   '#{deps/add-deps
      pods/load-pod
+     ns
      require})
 
 (def libs (->> (System/getenv "CLJ_IMPORTS_PATH")
