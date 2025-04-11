@@ -7,6 +7,7 @@ clerk nextjournal.clerk
 csv clojure.data.csv
 curl babashka.curl
 d ^{huahaiy/datalevin "0.9.22"} ^:pod pod.huahaiy.datalevin
+snitch ^{org.clojars.abhinav/snitch "0.1.16"} ^{:refer [defn* *fn *let]} snitch.core
 deps babashka.deps
 diff ^{lambdaisland/deep-diff2 "2.11.216"} lambdaisland.deep-diff2
 dtf ^{com.widdindustries/cljc.java-time "0.1.21"} cljc.java-time.format.date-time-formatter
