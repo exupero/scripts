@@ -1,5 +1,6 @@
 b ^{backtick/backtick "0.3.5"} backtick
 bling ^{io.github.paintparty/bling "0.4.2"} ^{:refer [bling]} bling.core
+bootleg ^{retrogradeorbit/bootleg "0.1.9"} ^:pod pod.retrogradeorbit.bootleg.utils
 c ^{clojure-term-colors/clojure-term-colors "0.1.0"} clojure.term.colors
 csk ^{camel-snake-kebab/camel-snake-kebab "0.4.3"} camel-snake-kebab.core
 cske ^{camel-snake-kebab/camel-snake-kebab "0.4.3"} camel-snake-kebab.extras
@@ -20,6 +21,7 @@ fs babashka.fs
 fw ^{org.babashka/fswatcher "0.0.5"} ^:pod pod.babashka.fswatcher
 h ^{com.github.seancorfield/honeysql "2.5.1091"} honey.sql
 hiccup hiccup2.core
+http-client org.httpkit.client
 io clojure.java.io
 json cheshire.core
 ld ^{com.widdindustries/cljc.java-time "0.1.21"} cljc.java-time.local-date
