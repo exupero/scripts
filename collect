@@ -1,0 +1,15 @@
+#!/usr/bin/env bb
+
+(ns collect
+  (:require [clojure.java.io :as io]))
+
+(when (= *file* (System/getProperty "babashka.file"))
+  (let [[pattern] *command-line-args*
+        pattern (re-pattern pattern)
+        collected (atom [])]
+    (doseq [line (line-seq (io/reader *in*))]
+      (when (re-find pattern line)
+        (swap! collected conj line))
+      (println line))
+    (doseq [line @collected]
+      (println line))))
