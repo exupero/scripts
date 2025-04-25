@@ -195,7 +195,7 @@ listenOnWebsocket();
   (println "Received data on" ch ":" (pr-str msg)))
 
 (defn on-close [ch _]
-  (swap! path->channels (partial into {} (map #(disj % ch)))))
+  (swap! path->channels update-vals #(disj % ch)))
 
 (defn watch [dir]
   (fw/watch dir
@@ -210,7 +210,7 @@ listenOnWebsocket();
             (server/send! ch content)))))
     {:recursive true}))
 
-(defn serve [{:keys [port dir open]}]
+(defn serve [{:keys [port dir open live-reload]}]
   (assert (fs/directory? dir) (str "The given path `" dir "` is not a directory."))
   (let [watcher (watch dir)]
     (server/run-server
@@ -226,7 +226,9 @@ listenOnWebsocket();
              (nil? f)
              , (not-found f dir)
              (-> f fs/file-name ext-mime-type (= "text/html"))
-             , (body f inject-live-reload-js)
+             , (if live-reload
+                 (body f inject-live-reload-js)
+                 (body f))
              :else
              , (body f)))))
      {:port port})
