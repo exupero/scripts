@@ -8,7 +8,6 @@ clerk nextjournal.clerk
 csv clojure.data.csv
 curl babashka.curl
 d ^{huahaiy/datalevin "0.9.22"} ^:pod pod.huahaiy.datalevin
-snitch ^{org.clojars.abhinav/snitch "0.1.16"} ^{:refer [defn* *fn *let]} snitch.core
 deps babashka.deps
 diff ^{lambdaisland/deep-diff2 "2.11.216"} lambdaisland.deep-diff2
 dtf ^{com.widdindustries/cljc.java-time "0.1.21"} cljc.java-time.format.date-time-formatter
@@ -22,6 +21,7 @@ fw ^{org.babashka/fswatcher "0.0.5"} ^:pod pod.babashka.fswatcher
 h ^{com.github.seancorfield/honeysql "2.5.1091"} honey.sql
 hiccup hiccup2.core
 http-client org.httpkit.client
+insta ^{io.github.babashka/instaparse-bb "0.0.6"} instaparse.core
 io clojure.java.io
 json cheshire.core
 ld ^{com.widdindustries/cljc.java-time "0.1.21"} cljc.java-time.local-date
@@ -44,6 +44,7 @@ sci ^{org.babashka/sci "0.9.45"} sci.core
 scriptjure ^{scriptjure/scriptjure "0.1.24"} com.reasonr.scriptjure
 server org.httpkit.server
 shell clojure.java.shell
+snitch ^{org.clojars.abhinav/snitch "0.1.16"} ^{:refer [defn* *fn *let]} snitch.core
 sp ^{com.rpl/specter "1.1.4"} com.rpl.specter
 sqlite ^{org.babashka/go-sqlite3 "0.1.0"} ^:pod pod.babashka.go-sqlite3
 stash ^{rorokimdim/stash "0.3.4"} ^:pod pod.rorokimdim.stash
