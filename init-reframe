@@ -39,7 +39,7 @@ cat << EOF > resources/public/index.html
     <title>$name</title>
     <meta charset="UTF-8" />
     <meta content="width=device-width, initial-scale=1" name="viewport" />
-    <link rel="icon" href="data:," />
+    <link rel="icon" type="image/x-icon" href="favicon.ico">
     <link rel="apple-touch-icon" href="data:," />
     <link rel="stylesheet" href="/style.css" />
   </head>
@@ -53,11 +53,6 @@ EOF
 cat << EOF > resources/public/style.css
 * {
   box-sizing: border-box;
-}
-
-html {
-  font-family: 'PT Sans', sans-serif;
-  font-size: 16pt;
 }
 EOF
 

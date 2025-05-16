@@ -1,0 +1,120 @@
+#!/bin/bash
+
+name=${PWD##*/}
+
+npm init -y
+npm install --save-dev shadow-cljs
+
+mkdir -p \
+  src/main/$name \
+  src/dev \
+  src/test \
+  resources/public
+
+cat << EOF > shadow-cljs.edn
+{:deps true
+ :dev-http {8000 "resources/public"}
+ :builds {:app {:target :browser
+                :output-dir "resources/public/js"
+                :asset-path "/js"
+                :modules {:app {:entries [$name.app]
+                                :init-fn $name.app/init}}
+                :devtools {:watch-dir "resources/public"
+                           :preloads [hashp.core]}}}}
+EOF
+
+cat << EOF > deps.edn
+{:paths ["src/dev" "src/main" "src/test"]
+ :deps {hashp/hashp {:mvn/version "0.2.2"}
+        no.cjohansen/replicant {:mvn/version "2025.03.27"}
+        org.clojure/clojure {:mvn/version "1.12.0"}
+        thheller/shadow-cljs {:mvn/version "2.11.23"}}}
+EOF
+
+cat << EOF > resources/public/index.html
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>$name</title>
+    <meta charset="UTF-8" />
+    <meta content="width=device-width, initial-scale=1" name="viewport" />
+    <link rel="icon" type="image/x-icon" href="favicon.ico">
+    <link rel="apple-touch-icon" href="data:," />
+    <link rel="stylesheet" href="/style.css" />
+  </head>
+  <body>
+    <div id="app"></div>
+    <script src="/js/app.js"></script>
+  </body>
+</html>
+EOF
+
+cat << EOF > resources/public/style.css
+* {
+  box-sizing: border-box;
+}
+EOF
+
+cat << EOF > bb.edn
+{:paths ["bb"]
+ :tasks {publish (shell "git subtree push --prefix=resources/public origin gh-pages")
+         release (do
+                   (apply shell "npx shadow-cljs release app" *command-line-args*)
+                   (shell "git add -f resources/public/js/app.js"))
+         server (apply shell "npx shadow-cljs server" *command-line-args*)
+         test (apply shell "npx shadow-cljs compile test --config-merge '{:autorun true}'" *command-line-args*)
+         watch (apply shell "npx shadow-cljs watch app" *command-line-args*)}}
+EOF
+
+cat << EOF > .tmuxrc
+rename-session $name
+rename-window vim
+
+new-window -n daemons
+send "bb server" C-m
+split-window -h
+send "bb watch" C-m
+EOF
+
+cat << EOF > .gitignore
+.shadow-cljs
+resources/public/js
+!resources/public/js/app.js
+EOF
+
+cat << EOF > src/main/$name/views.cljs
+(ns $name.views)
+
+(defn app [state]
+  [:h1 "$name"])
+EOF
+
+cat << EOF > src/main/$name/app.cljs
+(ns $name.app
+  (:require [replicant.dom :as r]
+            $name.events
+            $name.views))
+
+(defonce store (atom {}))
+
+(defonce el (js/document.getElementById "app"))
+
+(defn ^:dev/after-load render []
+(add-watch store ::render
+           (fn [_ _ _ state]
+             (r/render el ($name.views/app state))))
+
+(defn init []
+  (r/render el ($name.views/app @store)))
+EOF
+
+git add -- \
+  .gitignore \
+  package.json \
+  bb.edn \
+  deps.edn \
+  package-lock.json \
+  resources/public/index.html \
+  resources/public/style.css \
+  shadow-cljs.edn \
+  src

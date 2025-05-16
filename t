@@ -6,7 +6,9 @@
             [babashka.deps :as deps]
             [babashka.process :as p]
             selmer.parser
-            git))
+            git
+            markdown)
+  (:import [java.io File]))
 (deps/add-deps '{:deps {com.widdindustries/cljc.java-time {:mvn/version "0.1.21"}}})
 (require '[cljc.java-time.format.date-time-formatter :as dtf]
          '[cljc.java-time.local-date :as ld])
@@ -35,39 +37,44 @@
       (str/replace #"^-+|-+$" "")
       str/lower-case))
 
+(defn edit-tempfile [dir content]
+  (let [tempfile (File/createTempFile "task-" ".md")]
+    (spit tempfile content)
+    @(p/shell {:dir dir} "nvim" tempfile)
+    tempfile))
+
 (defmulti execute (fn [cmd _] cmd))
 
 (defmethod execute :init [_ {:keys [dir]}]
   (ensure-directory! dir)
   (ensure-directory! (str dir "/_templates"))
   (spit (str dir "/_templates/generic.md")
-        "---\ncreated: {{datestamp}}\ntype: {{type}}\n---\n\n# {{title|safe}}\n\n"))
+        "---\ncreated: {{datestamp}}\ntype: {{type}}\n---\n\n# {{title|safe}}"))
 
-(defmethod execute :add [_ {[type title] :args :keys [dir]}]
+(defmethod execute :add [_ {[type] :args :keys [dir]}]
   (let [type (types (keyword type))
         datestamp (dtf/format (dtf/of-pattern "yyyy-MM-dd") (ld/now))
         template (slurp (or (get-file (str dir "/_templates/" type ".md"))
                             (get-file (str dir "/_templates/generic.md"))))
+        content (selmer.parser/render template
+                                      {:title ""
+                                       :datestamp datestamp
+                                       :type type})
+        file (edit-tempfile dir content)
+        edited-content (slurp file)
+        title (-> edited-content
+                  str/split-lines
+                  (->> (filter (partial re-find #"^# ")))
+                  first
+                  (subs 2))
         filename (str dir "/" datestamp "-" type "-" (slug title) ".md")]
-    (spit filename
-          (selmer.parser/render template
-                                {:title title
-                                 :datestamp datestamp
-                                 :type type}))
-    (p/shell (System/getenv "EDITOR") filename)))
+    (spit filename edited-content)))
 
-(defmethod execute :list [_ {:keys [dir]}]
-  (let [files (->> (io/file dir)
-                   (.listFiles)
-                   (filter #(.endsWith (.getName %) ".md"))
-                   (sort-by #(.lastModified %))
-                   reverse)]
-    (doseq [file files]
-      (println (.getName file)))))
+; TODO add `list` sub-command that shows titles from file content
+  ; TODO indicate states of items
+  ; TODO include option to filter items by status
 
-(defmethod execute :edit [_ {[filename] :args :keys [dir]}]
-  (let [filename (io/file dir filename)]
-    (p/shell (System/getenv "EDITOR") (str filename))))
+; TODO add `done` sub-command
 
 (when (= *file* (System/getProperty "babashka.file"))
   (let [[cmd & args] *command-line-args*
