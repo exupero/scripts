@@ -9,26 +9,40 @@ mkdir -p \
   src/main/$name \
   src/dev \
   src/test \
-  resources/public
-
-cat << EOF > shadow-cljs.edn
-{:deps true
- :dev-http {8000 "resources/public"}
- :builds {:app {:target :browser
-                :output-dir "resources/public/js"
-                :asset-path "/js"
-                :modules {:app {:entries [$name.app]
-                                :init-fn $name.app/init}}
-                :devtools {:watch-dir "resources/public"
-                           :preloads [hashp.core]}}}}
-EOF
+  resources/public \
+  portfolio/resources/public \
+  portfolio/src
 
 cat << EOF > deps.edn
-{:paths ["src/dev" "src/main" "src/test"]
+{:paths ["src/dev" "src/main" "src/test" "resources"]
  :deps {hashp/hashp {:mvn/version "0.2.2"}
         no.cjohansen/replicant {:mvn/version "2025.03.27"}
         org.clojure/clojure {:mvn/version "1.12.0"}
-        thheller/shadow-cljs {:mvn/version "2.11.23"}}}
+        thheller/shadow-cljs {:mvn/version "2.11.23"}}
+ :aliases {:dev {:extra-paths ["portfolio/src"]
+                 :extra-deps {no.cjohansen/portfolio {:mvn/version "2025.01.28"}}}}}
+EOF
+
+cat << EOF > shadow-cljs.edn
+{:deps true
+ :dev-http {8000 ["resources/public"]
+            8001 ["portfolio/resources/public" "classpath:public"]}
+ :builds {:app
+          {:target :browser
+           :output-dir "resources/public/js"
+           :asset-path "/js"
+           :modules {:app {:entries [$name.app]
+                           :init-fn $name.app/init}}
+           :devtools {:watch-dir "resources/public"
+                      :preloads [hashp.core]}}
+
+          :portfolio
+          {:target :browser
+           :modules {:scenes {:init-fn portfolio/main}}
+           :output-dir "portfolio/resources/public/js"
+           :asset-path "/js"
+           :devtools {:watch-dir "resources/public"
+                      :preloads [hashp.core]}}}}
 EOF
 
 cat << EOF > resources/public/index.html
@@ -38,7 +52,7 @@ cat << EOF > resources/public/index.html
     <title>$name</title>
     <meta charset="UTF-8" />
     <meta content="width=device-width, initial-scale=1" name="viewport" />
-    <link rel="icon" type="image/x-icon" href="favicon.ico">
+    <link rel="icon" type="image/x-icon" href="data:image/x-icon;,">
     <link rel="apple-touch-icon" href="data:," />
     <link rel="stylesheet" href="/style.css" />
   </head>
@@ -63,7 +77,7 @@ cat << EOF > bb.edn
                    (shell "git add -f resources/public/js/app.js"))
          server (apply shell "npx shadow-cljs server" *command-line-args*)
          test (apply shell "npx shadow-cljs compile test --config-merge '{:autorun true}'" *command-line-args*)
-         watch (apply shell "npx shadow-cljs watch app" *command-line-args*)}}
+         watch (apply shell "npx shadow-cljs watch app portfolio" *command-line-args*)}}
 EOF
 
 cat << EOF > .tmuxrc
@@ -79,33 +93,63 @@ EOF
 cat << EOF > .gitignore
 .shadow-cljs
 resources/public/js
+portfolio/resources/public/js
 !resources/public/js/app.js
 EOF
 
-cat << EOF > src/main/$name/views.cljs
-(ns $name.views)
+cat << EOF > src/main/$name/ui.cljs
+(ns $name.ui)
 
-(defn app [state]
+(defn main [state]
   [:h1 "$name"])
 EOF
 
 cat << EOF > src/main/$name/app.cljs
 (ns $name.app
   (:require [replicant.dom :as r]
-            $name.events
-            $name.views))
+            $name.ui))
 
 (defonce store (atom {}))
 
 (defonce el (js/document.getElementById "app"))
 
 (defn ^:dev/after-load render []
-(add-watch store ::render
-           (fn [_ _ _ state]
-             (r/render el ($name.views/app state))))
+  (r/render el ($name.ui/main @store)))
 
 (defn init []
-  (r/render el ($name.views/app @store)))
+  (render)
+  (add-watch store ::render
+             (fn [_ _ _ state]
+               (r/render el ($name.ui/main state)))))
+EOF
+
+cat << EOF > portfolio/resources/public/index.html
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Portfolio!</title>
+</head>
+<body>
+    <div id="app-root"></div>
+    <script src="/js/scenes.js"></script>
+</body>
+</html>
+EOF
+
+cat << EOF > portfolio/src/portfolio.cljs
+(ns portfolio
+  (:require [portfolio.ui :as ui]
+            [portfolio.replicant :refer-macros [defscene]]
+            $name.ui))
+
+(defscene main
+  [$name.ui/main {}])
+
+(defn main []
+  (ui/start!
+    {:config
+     {:css-paths ["/style.css"]}}))
 EOF
 
 git add -- \
@@ -117,4 +161,5 @@ git add -- \
   resources/public/index.html \
   resources/public/style.css \
   shadow-cljs.edn \
-  src
+  src \
+  portfolio
