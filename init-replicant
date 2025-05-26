@@ -77,16 +77,14 @@ cat << EOF > bb.edn
                    (shell "git add -f resources/public/js/app.js"))
          server (apply shell "npx shadow-cljs server" *command-line-args*)
          test (apply shell "npx shadow-cljs compile test --config-merge '{:autorun true}'" *command-line-args*)
-         watch (apply shell "npx shadow-cljs watch app portfolio" *command-line-args*)}}
+         watch (apply shell "npx shadow-cljs watch app portfolio -A dev" *command-line-args*)}}
 EOF
 
 cat << EOF > .tmuxrc
 rename-session $name
 rename-window vim
 
-new-window -n daemons
-send "bb server" C-m
-split-window -h
+new-window -n daemons -t 9
 send "bb watch" C-m
 EOF
 
@@ -104,14 +102,24 @@ cat << EOF > src/main/$name/ui.cljs
   [:h1 "$name"])
 EOF
 
+cat << EOF > src/main/$name/events.cljs
+(ns $name.events)
+
+(defn dispatch! [event-data handler-data]
+  #p [event-data handler-data])
+EOF
+
 cat << EOF > src/main/$name/app.cljs
 (ns $name.app
   (:require [replicant.dom :as r]
+            $name.events
             $name.ui))
 
 (defonce store (atom {}))
 
 (defonce el (js/document.getElementById "app"))
+
+(r/set-dispatch! $name.events/dispatch!)
 
 (defn ^:dev/after-load render []
   (r/render el ($name.ui/main @store)))
@@ -141,12 +149,15 @@ cat << EOF > portfolio/src/portfolio.cljs
 (ns portfolio
   (:require [portfolio.ui :as ui]
             [portfolio.replicant :refer-macros [defscene]]
+            [replicant.dom :as r]
             $name.ui))
 
 (defscene main
   [$name.ui/main {}])
 
 (defn main []
+  (r/set-dispatch! (fn [event-data actions]
+                     (js/alert (str "REPLICANT DISPATCH!\n\nActions:\n" actions "\n\nData:\n" event-data))))
   (ui/start!
     {:config
      {:css-paths ["/style.css"]}}))

@@ -72,8 +72,6 @@ rename-session $name
 rename-window vim
 
 new-window -n daemons
-send "bb server" C-m
-split-window -h
 send "bb watch" C-m
 EOF
 
