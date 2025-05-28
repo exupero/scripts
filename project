@@ -7,13 +7,14 @@
 
 (defn time? [x]
   (and (string? x)
-       (re-matches #"\d+:\d+" x)))
+       (re-matches #"\d+:\d+:\d+" x)))
 
 (defn parse-arg [x]
   (cond
-    (number? x) x
-    (time? x)   (let [[h m] (map parse-long (str/split x #":" 2))]
-                  (+ m (* 60 h)))
+    (number? x) {:value x}
+    (time? x)   (let [[h m s] (map parse-long (str/split x #":" 3))]
+                  {:value (+ (* 60 h) m (/ s 60.0))
+                   :minutes? true})
     :else       (util/abort (str "Unrecognized argument '" x "'"))))
 
 (defn linear [[x1 x2] [y1 y2]]
@@ -21,17 +22,33 @@
         b (- y1 (* m x1))]
     #(+ b (* m %))))
 
-(defn as-time [x]
-  (let [h (int (/ x 60))
-        m (int (mod x 60))]
-    (str h ":" (format "%02d" m))))
+(defn divmod [a b]
+  [(int (/ a b))
+   (mod a b)])
 
-(cli/with-opts [[]
+(defn as-time [x]
+  (let [[h m] (divmod x 60)
+        [m s] (divmod (* m 60) 60)
+        s (int s)]
+    (str h ":" (format "%02d" m) ":" (format "%02d" s))))
+
+(cli/with-opts [[[-p --percentage "Report latest output as percentage of target output"]
+                 [-r --rate "Report rate of change"]]
                 [& args]]
-  (let [[_ _ y1-raw] args
-        [x1 x2 y1 y2 x] (map parse-arg args)
-        f (linear [x1 x2] [y1 y2])
-        y (f x)]
-    (if (time? y1-raw)
-      (println (as-time y))
-      (println (float y)))))
+  (let [[x1 y1 x2 y2 x] (map parse-arg args)
+        f (linear [(x1 :value) (x2 :value)] [(y1 :value) (y2 :value)])
+        y (f (x :value))]
+    (println
+      (if (y1 :minutes?)
+        (as-time y)
+        (float y)))
+    (when percentage
+      (println (format "%.2f%%" (float (* 100 (/ (x2 :value) (x :value)))))))
+    (when rate
+      (let [[dt dv] (cond
+                      (x1 :minutes?) [(- (x2 :value) (x1 :value))
+                                      (- (y2 :value) (y1 :value))]
+                      (y1 :minutes?) [(- (y2 :value) (y1 :value))
+                                      (- (x2 :value) (x1 :value))])
+            rate (/ dv dt)]
+        (println (str (Math/round rate) "/minute"))))))
