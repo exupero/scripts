@@ -95,40 +95,46 @@ portfolio/resources/public/js
 !resources/public/js/app.js
 EOF
 
-cat << EOF > src/main/$name/ui.cljs
-(ns $name.ui)
-
-(defn main [state]
-  [:h1 "$name"])
-EOF
-
-cat << EOF > src/main/$name/events.cljs
-(ns $name.events)
-
-(defn dispatch! [event-data handler-data]
-  #p [event-data handler-data])
-EOF
-
 cat << EOF > src/main/$name/app.cljs
 (ns $name.app
   (:require [replicant.dom :as r]
+            $name.db
             $name.events
             $name.ui))
-
-(defonce store (atom {}))
 
 (defonce el (js/document.getElementById "app"))
 
 (r/set-dispatch! $name.events/dispatch!)
 
 (defn ^:dev/after-load render []
-  (r/render el ($name.ui/main @store)))
+  (r/render el ($name.ui/main @$name.db/store)))
 
 (defn init []
   (render)
-  (add-watch store ::render
+  (add-watch $name.db/store ::render
              (fn [_ _ _ state]
                (r/render el ($name.ui/main state)))))
+EOF
+
+cat << EOF > src/main/$name/db.cljs
+(ns $name.db)
+
+(defonce store (atom {}))
+EOF
+
+cat << EOF > src/main/$name/events.cljs
+(ns $name.events
+  (:require $name.db))
+
+(defn dispatch! [event-data handler-data]
+  #p [event-data handler-data])
+EOF
+
+cat << EOF > src/main/$name/ui.cljs
+(ns $name.ui)
+
+(defn main [state]
+  [:h1 "$name"])
 EOF
 
 cat << EOF > portfolio/resources/public/index.html
