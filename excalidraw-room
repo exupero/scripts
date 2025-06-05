@@ -1,0 +1,7 @@
+#!/usr/bin/env bb
+
+(ns excalidraw-room)
+
+(let [room-id (apply str (repeatedly 20 #(rand-nth "0123456789abcdef")))
+      encryption-key (apply str (repeatedly 22 #(rand-nth "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-")))]
+  (print (str "https://excalidraw.com/#room=" room-id "," encryption-key)))

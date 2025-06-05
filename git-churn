@@ -1,0 +1,26 @@
+#!/usr/bin/env bb
+
+(ns git-churn
+  (:require [clojure.java.shell :refer [sh]]
+            [clojure.java.io :as io]
+            [clojure.string :as string]))
+
+(let [dir (System/getProperty "user.dir")]
+  (-> (sh "git" "log" "--oneline" "--pretty=format:%h" :dir dir)
+      :out
+      string/split-lines
+      (->> (mapcat (fn [sha]
+                     (-> (sh "git" "diff-tree" "--no-commit-id" "--name-only" "-r" sha :dir dir)
+                         :out
+                         string/split-lines))))
+      (->> (filter (fn [filename]
+                     (let [file (io/file (str dir "/" filename))]
+                       (and (.exists file)
+                            (not (.isDirectory file))
+                            (not (re-find #"\.(pkl|zip)$" (.getName file))))))))
+      frequencies
+      (->> (map (fn [[file commits]]
+                  {:file file
+                   :commits commits
+                   :lines (-> (str dir "/" file) slurp string/split-lines count)})))
+      (->> (sort-by :commits >))))

@@ -1,0 +1,5 @@
+#!/bin/bash
+
+dir=$(dirname -- "${BASH_SOURCE[0]}")
+(echo '#!/usr/bin/env lua' && fennel -c $dir/fnl/$1.fnl) > $dir/$1
+chmod +x $dir/$1
