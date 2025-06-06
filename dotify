@@ -1,0 +1,40 @@
+#!/usr/bin/env bb
+
+(ns dotify
+  (:require [clojure.tools.cli :as cli]))
+
+(defn prune-leaves [{:keys [nodes edges]}]
+  (let [outs (into #{} (map :from) edges)
+        leaves (into #{}
+                     (comp
+                       (remove (comp outs :id))
+                       (map :id))
+                     nodes)]
+    (if (seq leaves)
+      (recur {:nodes (remove (comp leaves :id) nodes)
+              :edges (remove (comp leaves :to) edges)})
+      {:nodes nodes :edges edges})))
+
+(defn format-attrs [attrs]
+  (transduce
+    (comp
+      (map (fn [[k v]]
+             (str (name k) "=\"" (name v) \")))
+      (interpose ", "))
+    str
+    attrs))
+
+(def cli-options
+  [["-p" "--prune" "Recursively prune leaves"]])
+
+(let [{:keys [options]}
+      , (cli/parse-opts *command-line-args* cli-options)
+      graph (cond-> (read-string (slurp *in*))
+                    (options :prune) prune-leaves)]
+  (println "digraph {")
+  (println "  graph [dpi=300]")
+  (doseq [{:keys [id attrs]} (graph :nodes)]
+    (println (str "  \"" id "\" [" (format-attrs attrs) "]")))
+  (doseq [{:keys [from to attrs]} (graph :edges)]
+    (println (str "  \"" from "\" -> \"" to "\" [" (format-attrs attrs) "]")))
+  (println "}"))

@@ -1,0 +1,38 @@
+#!/usr/bin/env bb
+
+(ns pingmon
+  (:require [clojure.java.shell :refer [sh]]
+            [clojure.java.io :as io]
+            [babashka.process :as p]))
+
+(defn down! []
+  (sh "say" "-v" "bubbles" "du"))
+
+(defn up! []
+  (sh "say" "-v" "bubbles" "ba"))
+
+(defn up? []
+  (let [msg (read-line)]
+    (cond
+      (re-find #"64 bytes from 8.8.8.8" msg)
+      , true
+      (re-find #"Request timeout|Destination Host Unreachable" msg)
+      , false
+      :else
+      , (do
+          (println (format "Unexpected message from `ping`: %s" msg))
+          (recur)))))
+
+(let [[c] *command-line-args*
+      c (if c (Integer/parseInt c) 2)
+      proc (p/process ["ping" "8.8.8.8"])]
+  (sh "open" "http://dishy.starlink.com/statistics")
+  (with-open [rdr (io/reader (:out proc))]
+    (binding [*in* rdr]
+      (read-line) ; first line is the header `PING 8.8.8.8 (8.8.8.8): 56 data bytes`
+      (loop [on? true, recents ()]
+        (let [recents (take c (conj recents (up?)))]
+          (cond
+            (and on? (every? false? recents))      (do (down!) (recur false recents))
+            (and (not on?) (some true? recents))   (do (up!) (recur true recents))
+            :else                                  (recur on? recents)))))))

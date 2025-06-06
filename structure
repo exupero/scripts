@@ -1,0 +1,20 @@
+#!/usr/bin/env bb
+
+(ns structure
+  (:require clojure.pprint
+            [clojure.walk :as walk]
+            [cheshire.core :as json]))
+
+(defn shrink [data]
+  (cond
+    (sequential? data)
+    , [(first data)]
+    (map? data)
+    , (walk/postwalk shrink data)
+    :else
+    , data))
+
+(let [[path] *command-line-args*
+      path (if (= "-" path) *in* path)
+      json (json/parse-string (slurp path) true)]
+  (clojure.pprint/pprint (shrink json)))

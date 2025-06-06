@@ -1,0 +1,14 @@
+#!/usr/bin/env bb
+
+(ns local-ip
+  (:require [clojure.string :as str]
+            [clojure.java.shell :refer [sh]]))
+
+(-> (sh "ifconfig")
+    :out
+    str/split-lines
+    (->> (filter (partial re-find #"inet.*192")))
+    (->> (map str/trim))
+    (->> (map (partial re-find #"192\.[0-9.]+")))
+    first
+    print)

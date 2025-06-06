@@ -1,0 +1,30 @@
+#!/usr/bin/env bb
+
+(ns stack-graph
+  (:require [clojure.java.io :as io]
+            [clojure.tools.cli :as cli]))
+
+(def cli-options
+  [["-x" "--exclude PATTERN" "Exclude IDs matching PATTERN"]
+   ["-h" "--highlight THRESHOLD" "Highlights call counts exceeding THRESHOLD"
+    :default Integer/MAX_VALUE
+    :parse-fn #(Integer/parseInt %)]])
+
+(let [{:keys [options]}
+      , (cli/parse-opts *command-line-args* cli-options)
+      stacktrace (sequence
+                   (comp
+                     (filter (partial re-find #"^\s*at "))
+                     (map #(second (re-find #"^\s*at (.*)" %)))
+                     (if-let [pattern (options :exclude)]
+                       (remove (partial re-find (re-pattern pattern)))
+                       (comp)))
+                   (line-seq (io/reader *in*)))]
+  {:nodes (for [s (distinct stacktrace)]
+            {:id s
+             :attrs {:shape :rect}})
+   :edges (for [[[a b] c] (frequencies (partition 2 1 stacktrace))]
+            {:from b
+             :to a
+             :attrs (cond-> {:label (str \space c \x)}
+                            (<= (options :highlight) c) (assoc :color :red))})})

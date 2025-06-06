@@ -1,0 +1,10 @@
+#!/bin/bash
+
+target=$1
+
+tmux capture-pane -pJ -t "$target" -S - -E - | awk '
+  /^§/ {reset=1}
+  reset && /^[^§]/ {delete a; i=0; reset=0}
+  /^[^§]/ {a[i++]=$0}
+  END {for (j=0; j<i;) print a[j++]}
+'

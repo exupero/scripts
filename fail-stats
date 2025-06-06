@@ -1,0 +1,49 @@
+#!/usr/bin/env bb
+
+(ns fail-stats
+  (:require babashka.cli
+            [babashka.process :as p]))
+
+(def cli-opts
+  {:spec {:on-done {:desc "command to run when a run finishes"
+                    :alias :d}
+          :on-fail {:desc "command to run when a run fails"
+                    :alias :f}
+          :on-success {:desc "command to run when a run succeeds"
+                       :alias :s}
+          :on-timeout {:desc "command to run when a run times out"}
+          :quit-on-fail {:desc "quit when the first failure happens"
+                         :alias :q}
+          :timeout {:desc "max seconds to allow process to run before aborting it; defaults to 600 (10 minutes)"
+                    :alias :t
+                    :default 600}}})
+
+(when (= *file* (System/getProperty "babashka.file"))
+  (let [{{:keys [on-done on-fail on-success on-timeout quit-on-fail timeout]} :opts cmd :args}
+        , (babashka.cli/parse-args *command-line-args* cli-opts)
+        script-start-time (System/nanoTime)]
+    (loop [stats {:runs 0 :success 0 :fail 0 :timeout 0}]
+      (let [start-time (System/nanoTime)
+            proc (apply p/process {:in :inherit :out :inherit :err :inherit :shutdown p/destroy-tree} cmd)
+            {:keys [exit]} (deref proc (* timeout 1000) {:exit -1})
+            end-time (System/nanoTime)
+            timeout? (neg? exit)
+            _ (when timeout? (p/destroy-tree proc))
+            fail? (pos? exit)
+            success? (zero? exit)
+            k (cond
+                timeout? :timeout
+                fail? :fail
+                success? :success)
+            stats (-> stats
+                      (update :runs inc)
+                      (update k inc)
+                      (assoc :total-duration-ms (int (/ (- end-time script-start-time) 1000000))
+                             :last-run-duration-ms (int (/ (- end-time start-time) 1000000))))]
+        (prn stats)
+        (when (and timeout? on-timeout) , (p/shell on-timeout))
+        (when (and fail? on-fail)       , (p/shell on-fail))
+        (when (and success? on-success) , (p/shell on-success))
+        (when on-done                   , (p/shell on-done))
+        (when-not (and fail? quit-on-fail)
+          (recur stats))))))

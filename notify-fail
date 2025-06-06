@@ -1,0 +1,3 @@
+#!/bin/bash
+
+notify --title "$1" --sound basso

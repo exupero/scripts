@@ -1,0 +1,14 @@
+#!/usr/bin/env bb
+
+(ns rotate-lines
+  (:require [clojure.java.io :as io]
+            [clojure.string :as str]))
+
+(let [[fname stopper] *command-line-args*
+      stopper (or stopper "EOF")
+      [top & lines] (line-seq (io/reader (io/file fname)))]
+  (if (= top stopper)
+    (System/exit 1)
+    (do
+      (print top)
+      (spit fname (str/join "\n" (conj (vec lines) top))))))

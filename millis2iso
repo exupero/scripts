@@ -1,0 +1,10 @@
+#!/usr/bin/env bb
+
+(ns millis2iso
+  (:require [clojure.java.io :as io]
+            [time :as t]))
+
+(when (= *file* (System/getProperty "babashka.file"))
+  (doseq [millis (or (seq *command-line-args*)
+                     (line-seq (io/reader *in*)))]
+    (println (t/nanos->iso (* 1000000 (Long/parseLong millis))))))

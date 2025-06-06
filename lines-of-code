@@ -1,0 +1,33 @@
+#!/usr/bin/env bb
+
+(ns lines-of-code
+  (:require [clojure.java.io :as io]
+            [clojure.java.shell :as shell]
+            [clojure.string :as str]
+            text))
+
+(let [fields *command-line-args*]
+  (-> (shell/sh "git" "ls-tree" "--name-only" "-r" "HEAD")
+      :out
+      str/split-lines
+      (->> (sequence
+             (comp
+               (map io/file)
+               (remove #(.isDirectory %))
+               (remove #(re-matches #"package-lock.json" (.getName %)))
+               (remove #(re-find #"\.(csv|xml|gz|lock|woff2?|gitattributes|gitignore)$" (.getName %)))
+               (remove #(not (.exists %))) ; can happen when file is deleted but not yet removed from git
+               (map (fn [f]
+                      (let [path (.getPath f)]
+                        {:dir (re-find #"^[^/]+/" path)
+                         :path path
+                         :extension (some->> path (re-find #"\.([^.]+)$") second)
+                         :lines (count (remove (partial re-matches #"^\s*$")
+                                               (line-seq (io/reader f))))
+                         :test (re-find #"test" path)}))))))
+      (->> (group-by (apply juxt (map keyword fields))))
+      (->> (map (fn [[ks vs]]
+                  (assoc (zipmap fields ks)
+                         :lines-of-code (transduce (map :lines) + vs)))))
+      (->> (sort-by :lines-of-code >))
+      text/print-table))

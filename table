@@ -1,0 +1,3 @@
+#!/bin/bash
+
+ramda -o table --compact

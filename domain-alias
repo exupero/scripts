@@ -1,0 +1,25 @@
+#!/bin/bash
+
+# Usage: sudo domain-alias myapp 8000
+domain=$1
+port=$2
+
+if [ -z "$domain" ] || [ -z "$port" ]; then
+  echo "Usage: domain-alias.sh <domain> <port>"
+  exit 1
+fi
+
+existing=$(cat /etc/hosts | grep $domain | cut -d' ' -f1)
+if [ -n "$existing" ]; then
+  localip=$existing
+else
+  last=$(cat /etc/hosts | grep -oE "127.0.0.\d" | cut -d'.' -f4 | sort -n | tail -1)
+  next=$(expr $last + 1)
+  localip="127.0.0.$next"
+fi
+
+{
+  ifconfig lo0 alias $localip
+  echo "rdr pass on lo0 inet proto tcp from any to $localip port 80 -> $localip port $port" | pfctl -ef -
+  echo "$localip $domain" >> /etc/hosts
+} && echo "Done. Run apps at $localip port $port and view them at http://$domain/."

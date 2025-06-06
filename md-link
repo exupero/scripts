@@ -1,0 +1,18 @@
+#!/usr/bin/env obb
+
+(let [[text] *command-line-args*
+      app (doto (js/Application.currentApplication)
+            (as-> $ (set! (.-includeStandardAdditions $) true)))
+      se (js/Application "System Events")
+      firefox (js/Application "Firefox")
+      obsidian (js/Application "Obsidian")]
+  (.activate firefox)
+  (.keystroke se "l" #js {:using #js ["command down"]})
+  (js/delay 0.7)
+  (.keystroke se "c" #js {:using #js ["command down"]})
+  (js/delay 0.5)
+  (let [url (.theClipboard app)]
+    (.setTheClipboardTo app (str "[" text "](" url ")"))
+    (.activate obsidian)
+    (js/delay 0.2)
+    (.keystroke se "v" #js {:using #js ["command down"]})))

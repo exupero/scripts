@@ -1,0 +1,38 @@
+#!/usr/bin/env bb
+
+(def rethread
+  '#{map filter remove reduce transduce sequence})
+
+(defn simplify [form]
+  (if (= 1 (count form))
+    (first form)
+    form))
+
+(defn rethread [form]
+  (loop [form form
+         res ()]
+    (cond
+      (not (list? form))
+      , (list* '-> form res)
+      (rethread (first form))
+      , (recur
+          (last form)
+          (conj res (list '->> (butlast form))))
+      :else
+      , (recur
+          (second form)
+          (conj res (simplify (list* (first form) (drop 2 form))))))))
+
+(defn format-thread [[_ & segments]]
+  (str (transduce
+         (interpose "\n    ")
+         str
+         (str "(-> ")
+         segments)
+       ")"))
+
+(let [form (read-string *in*)]
+  (-> form
+      rethread
+      format-thread
+      print))

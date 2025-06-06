@@ -1,0 +1,8 @@
+#!/bin/bash
+
+target=$1
+
+tmux capture-pane -pJ -t "$target" -S - -E - \
+  | tail -r \
+  | awk 'start && /^§/ {exit} /^[^§]/ {start=1} start {print}' \
+  | tail -r

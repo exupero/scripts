@@ -1,0 +1,12 @@
+#!/usr/bin/env bb
+
+(ns pingoff
+  (:require [clojure.java.shell :refer [sh]]
+            [clojure.string :as string]))
+
+(-> (sh "ps" "aux")
+    :out
+    string/split-lines
+    (->> (filter (partial re-find #"pingmon")))
+    (->> (map (comp second #(string/split % #"\s+"))))
+    (as-> $ (apply sh "kill" "-9" $)))

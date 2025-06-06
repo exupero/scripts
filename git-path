@@ -1,0 +1,11 @@
+#!/usr/bin/env bb
+
+; Get the relative path of the given file from the repo's root
+(ns git-path
+  (:require [clojure.string :as str]
+            git))
+
+(let [[path] *command-line-args*]
+  (println (str/replace (str (System/getProperty "user.dir") "/" path)
+                        (str (git/root) "/")
+                        "")))

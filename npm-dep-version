@@ -1,0 +1,3 @@
+#!/bin/bash
+
+npm list --json | jq -r --arg pattern "$1" '.dependencies | to_entries | .[] | select(.key | test($pattern)) | .value.version' | sort | uniq

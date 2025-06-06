@@ -1,0 +1,17 @@
+#!/usr/bin/env bb
+
+(ns unparse
+  (:require [clojure.string :as string]
+            [clojure.walk :as walk]))
+
+(-> (slurp *in*)
+    read-string
+    (->> (walk/postwalk (fn [n]
+                          (if (and (vector? n) (= :string (first n)))
+                            (str \" (second n) \")
+                            n))))
+    flatten
+    (->> (remove keyword?))
+    string/join
+    string/trimr
+    println)

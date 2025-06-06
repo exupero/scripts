@@ -1,0 +1,9 @@
+#!/bin/bash
+
+# derived from https://stackoverflow.com/a/12967264
+echo "Running '$@', sending stdout to output.txt"
+count=0
+while "$@" >> output.txt; do
+  (( count++ )) ;
+  echo $count;
+done

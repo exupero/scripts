@@ -1,0 +1,25 @@
+#!/usr/bin/env bb
+
+(ns generify-uuids
+  (:require [clojure.string :as str]
+            uuid))
+
+(defn generify [text]
+  (let [c (atom 0)
+        uuids (atom {})]
+    (str/replace text uuid/uuid-pattern
+                 (fn [uuid]
+                   (let [uuid (java.util.UUID/fromString uuid)
+                         k (or (@uuids uuid)
+                               (let [k (swap! c inc)]
+                                 (swap! uuids assoc uuid k)
+                                 k))]
+                     (str "<UUID " k ">"))))))
+
+(comment
+  (print
+    (generify "f8ce6396-3bec-4af7-8539-4ef04cba5b6a - d5c252c5-59df-49d5-b37e-861b15ea86bb
+F8CE6396-3BEC-4AF7-8539-4EF04CBA5B6A - D5C252C5-59DF-49D5-B37E-861B15EA86BB")))
+
+(when (= *file* (System/getProperty "babashka.file"))
+  (print (generify (slurp *in*))))

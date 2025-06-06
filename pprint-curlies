@@ -1,0 +1,86 @@
+#!/usr/bin/env bb
+
+(ns pprint-curlies
+  (:require clojure.pprint
+            cli))
+
+(defn clojure-style [text]
+  (let [out (StringBuilder.)]
+    (loop [cs (seq text)
+           column 0
+           indents [0]]
+      (if-let [[c & cs] cs]
+        (do
+          (.append out c)
+          (cond
+            (= c \,)
+            , (do
+                (doto out
+                  (.append \newline)
+                  (.append (apply str (repeat (peek indents) " "))))
+                (recur cs (peek indents) indents))
+            (#{\( \[ \{} c)
+            , (recur cs (inc column) (conj indents (inc column)))
+            (#{\) \] \}} c)
+            , (recur cs (peek (pop indents)) (pop indents))
+            :else
+            , (recur cs (inc column) indents)))
+        (str out)))))
+
+(comment
+  (print (clojure-style "[a,b={c=d,e=f(g,h),i},j,k]")))
+
+(def closing
+  {\( \)
+   \[ \]
+   \{ \}})
+
+(defn js-style [text]
+  (let [out (StringBuilder.)]
+    (loop [cs (seq text)
+           indents [0]]
+      (if-let [[c & cs] cs]
+        (do
+          (cond
+            (= c \,)
+            , (let [[d & ds] cs
+                    cs (if (= \space d) ds cs)]
+                (doto out
+                  (.append c)
+                  (.append \newline)
+                  (.append (apply str (repeat (peek indents) " "))))
+                (recur cs indents))
+            (#{\( \[ \{} c)
+            , (let [new-indent (+ 2 (peek indents))
+                    [d & ds] cs]
+                (if (= d (closing c))
+                  (do
+                    (doto out
+                      (.append c)
+                      (.append d))
+                    (recur ds indents))
+                  (do
+                    (doto out
+                      (.append c)
+                      (.append \newline)
+                      (.append (apply str (repeat new-indent " "))))
+                    (recur cs (conj indents new-indent)))))
+            (#{\) \] \}} c)
+            , (let [new-indent (peek (pop indents))]
+                (doto out
+                  (.append \newline)
+                  (.append (apply str (repeat new-indent " ")))
+                  (.append c))
+                (recur cs (pop indents)))
+            :else
+            , (do
+                (.append out c)
+                (recur cs indents))))
+        (str out)))))
+
+(comment
+  (print (js-style "[a,b={c=d,e=f(g,h),i},j,k]"))
+  (print (js-style "[{a,b}, {c,d}]")))
+
+(when (= *file* (System/getProperty "babashka.file"))
+  (print (js-style (slurp *in*))))

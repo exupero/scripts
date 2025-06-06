@@ -1,0 +1,18 @@
+#!/usr/bin/env bb
+
+(ns word-game
+  (:require [clojure.java.io :as io]
+            [clojure.string :as str]
+            cli))
+
+(cli/with-opts [[]
+                [& letters]]
+  (let [letters (frequencies (str/lower-case (str/join "" letters)))
+        matches (->> (line-seq (io/reader "/usr/share/dict/words"))
+                     (filter (fn [word]
+                               (every? (fn [[c cnt]]
+                                         (<= cnt (letters c 0)))
+                                       (frequencies (str/lower-case word)))))
+                     (sort-by count))]
+    (doseq [match matches]
+      (println match))))

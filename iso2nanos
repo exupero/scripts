@@ -1,0 +1,10 @@
+#!/usr/bin/env bb
+
+(ns iso2nanos
+  (:require [clojure.java.io :as io]
+            [time :as t]))
+
+(when (= *file* (System/getProperty "babashka.file"))
+  (doseq [iso (or (seq *command-line-args*)
+                  (line-seq (io/reader *in*)))]
+    (println (t/iso->nanos iso))))

@@ -1,0 +1,65 @@
+#!/usr/bin/env bb
+
+(ns stacktrace2filelines
+  (:require [clojure.java.io :as io]
+            [clojure.string :as str]
+            [babashka.deps :as deps]
+            cli
+            git
+            js))
+(deps/add-deps '{:deps {net.cgrand/xforms {:mvn/version "0.19.6"}}})
+(require '[net.cgrand.xforms :as xf])
+
+(def subdirs
+  ["appserver"
+   "cache"
+   "common"
+   "compute"
+   "seriesdata"])
+
+(defn files-by-name [dirs]
+  (->> dirs
+       (mapcat (comp file-seq io/file))
+       (into {}
+             (comp
+               (remove #(.isDirectory %))
+               (filter #(re-find #"\.(java|kt)" (.getName %)))
+               (xf/by-key #(.getName %) (xf/into []))))))
+
+(defn vim-line [text dir index]
+  (or (when-let [[_ filename line-number] (re-find #"^\s*at .+\((.+):(\d+)\)$" text)]
+        (when-let [files (seq (index filename))]
+          (map #(str (str/replace (.getAbsolutePath %) (str dir "/") "")
+                     \: line-number ": " text)
+               files)))
+      [(str/trim text)]))
+
+(defn json-line [[position text] dir index]
+  (or (when-let [[_ filename line-number] (re-find #"^\s*at .+\((.+):(\d+)\)$" text)]
+        (when-let [files (seq (index filename))]
+          (map #(do {:path (str/replace (.getAbsolutePath %) (str dir "/") "")
+                     :line (parse-long line-number)
+                     :text text
+                     :position position})
+               files)))
+      [{:text (str/trim text)}]))
+
+(cli/with-opts [[[-j --json "output data as json"]]
+                []]
+  (let [root (git/root)
+        index (files-by-name (map (partial str root "/") subdirs))
+        dir (System/getProperty "user.dir")]
+    (if json
+      (->> (slurp *in*)
+           str/split-lines
+           (map vector (range))
+           (mapcat #(json-line % dir index))
+           js/pprint)
+      (->> (slurp *in*)
+           str/split-lines
+           (transduce
+             (comp
+               (mapcat #(vim-line % dir index))
+               (interpose "\n"))
+             str)
+           print))))

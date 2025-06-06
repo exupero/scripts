@@ -245,6 +245,10 @@ listenOnWebsocket();
                 :alias :d
                 :coerce :string
                 :default "."}
+          :ip {:desc "IP address to serve on"
+               :alias :i
+               :coerce :string
+               :default "127.0.0.1"}
           :live-reload {:desc "whether to live reload HTML"
                         :alias :l
                         :coerce :boolean

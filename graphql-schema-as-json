@@ -1,0 +1,20 @@
+#!/usr/bin/env node
+// vim: ft=javascript
+// requires npm's 'graphql' package
+
+import fs from 'fs';
+import { buildSchema, parse, printSchema } from 'graphql';
+
+fs.readFile(process.argv[2], 'utf8', (err, schema) => {
+    if (err) {
+        console.error('Error reading the schema file:', err);
+        process.exit(1);
+    }
+
+    try {
+        console.log(JSON.stringify(parse(printSchema(buildSchema(schema)))))
+    } catch (parseError) {
+        console.error('Error parsing schema:', parseError);
+        process.exit(1);
+    }
+});

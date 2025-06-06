@@ -1,0 +1,66 @@
+#!/usr/bin/env bb
+
+(ns proxy-server
+  (:require [clojure.string :as str]
+            [clojure.tools.cli :as cli]
+            [org.httpkit.server :as server]
+            [org.httpkit.client :as http-client]))
+
+(defn build-url [host path query-string]
+  (let [url (java.net.URL. (java.net.URL. host) path)]
+    (if (not-empty query-string)
+      (str url "?" query-string)
+      (str url))))
+
+(defn stringify-body [resp]
+  (update resp :body (fn [body]
+                       (if (string? body)
+                         body
+                         (slurp body)))))
+
+(defn update-headers [resp]
+  (update resp :headers
+          (fn [headers]
+            (-> (into {}
+                      (map (fn [[k v]]
+                             [(name k) v]))
+                      headers)
+                (assoc "content-length" (some-> resp :body count
+                                                (as-> $ (when (pos? $) $)))
+                       "Connection" "keep-alive")
+                (dissoc "transfer-encoding")))))
+
+(defn handler [host]
+  (fn [req]
+    (let [req (-> req
+                  (update :body #(when % (slurp %))))
+          {:keys [uri query-string request-method body headers]} req
+          method (str/upper-case (name request-method))
+          url (build-url host uri query-string)
+          _ (println method url)
+          resp (-> {:url url
+                    :method request-method
+                    :body body
+                    :headers (dissoc headers "host" "content-length")
+                    :compressed false
+                    :throw false}
+                   http-client/request
+                   deref
+                   (dissoc :opts :async-channel :err :process :exit)
+                   stringify-body
+                   update-headers)]
+      (println method url (resp :status))
+      resp)))
+
+(def cli-options
+  [["-p" "--port PORT" "port to serve the reverse proxy on"
+    :default 44216
+    :parse-fn #(Integer/parseInt %)]
+   ["-h" "--host HOST" "host to redirect requests to"
+    :default "http://localhost:34216"]])
+
+(let [{{:keys [port host]} :options}
+      , (cli/parse-opts *command-line-args* cli-options)]
+  (server/run-server (handler host) {:port port})
+  (println "Server running on port" port "and redirecting to" host)
+  @(promise))
