@@ -5,6 +5,7 @@
             [clojure.string :as str]
             [babashka.deps :as deps]
             [babashka.process :as p]
+            [clj-yaml.core :as yaml]
             selmer.parser
             git
             markdown)
@@ -43,6 +44,9 @@
     @(p/shell {:dir dir} "nvim" tempfile)
     tempfile))
 
+(defn fmt-date [date]
+  (dtf/format (dtf/of-pattern "yyyy-MM-dd") date))
+
 (defmulti execute (fn [cmd _] cmd))
 
 (defmethod execute :init [_ {:keys [dir]}]
@@ -53,7 +57,7 @@
 
 (defmethod execute :add [_ {[type] :args :keys [dir]}]
   (let [type (types (keyword type))
-        datestamp (dtf/format (dtf/of-pattern "yyyy-MM-dd") (ld/now))
+        datestamp (fmt-date (ld/now))
         template (slurp (or (get-file (str dir "/_templates/" type ".md"))
                             (get-file (str dir "/_templates/generic.md"))))
         content (selmer.parser/render template
@@ -70,11 +74,18 @@
         filename (str dir "/" datestamp "-" type "-" (slug title) ".md")]
     (spit filename edited-content)))
 
+(defmethod execute :done [_ {[filename] :args}]
+  (let [path (slurp filename)
+        [fm content] (markdown/frontmatter+content path)
+        fm (assoc fm :status "done" :done (fmt-date (ld/now)))]
+    (spit filename (str "---\n"
+                        (yaml/generate-string fm :dumper-options {:flow-style :block})
+                        "---\n"
+                        content))))
+
 ; TODO add `list` sub-command that shows titles from file content
   ; TODO indicate states of items
   ; TODO include option to filter items by status
-
-; TODO add `done` sub-command
 
 (when (= *file* (System/getProperty "babashka.file"))
   (let [[cmd & args] *command-line-args*

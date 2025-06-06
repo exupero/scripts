@@ -1,0 +1,12 @@
+#!/bin/bash
+
+source=$1
+dest=$2
+radius=$3
+
+convert "$source" \
+  \( +clone  -alpha extract \
+    -draw "fill black polygon 0,0 0,$radius $radius,0 fill white circle $radius,$radius $radius,0" \
+    \( +clone -flip \) -compose Multiply -composite \
+    \( +clone -flop \) -compose Multiply -composite \
+  \) -alpha off -compose CopyOpacity -composite -define icon:auto-resize=64,48,32,16 "$dest"
