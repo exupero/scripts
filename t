@@ -9,7 +9,8 @@
             selmer.parser
             git
             markdown)
-  (:import [java.io File]))
+  (:import [java.io File]
+           [java.text SimpleDateFormat]))
 (deps/add-deps '{:deps {com.widdindustries/cljc.java-time {:mvn/version "0.1.21"}}})
 (require '[cljc.java-time.format.date-time-formatter :as dtf]
          '[cljc.java-time.local-date :as ld])
@@ -47,6 +48,15 @@
 (defn fmt-date [date]
   (dtf/format (dtf/of-pattern "yyyy-MM-dd") date))
 
+(defn update-frontmatter [filename f & args]
+  (let [[fm content] (markdown/frontmatter+content (slurp filename))
+        fm (apply f fm args)]
+    (spit filename
+          (str "---\n"
+               (yaml/generate-string fm :dumper-options {:flow-style :block})
+               "---\n"
+               content))))
+
 (defmulti execute (fn [cmd _] cmd))
 
 (defmethod execute :init [_ {:keys [dir]}]
@@ -74,14 +84,25 @@
         filename (str dir "/" datestamp "-" type "-" (slug title) ".md")]
     (spit filename edited-content)))
 
+(defmethod execute :rename [_ {[filename] :args :keys [dir]}]
+  (let [[{:keys [created type]} content] (markdown/frontmatter+content (slurp filename))
+        datestamp (.format (SimpleDateFormat. "yyyy-MM-dd") created)
+        title (-> content
+                  str/split-lines
+                  (->> (filter (partial re-find #"^# ")))
+                  first
+                  (subs 2))
+        new-filename (str dir "/" datestamp "-" type "-" (slug title) ".md")]
+    (.renameTo (io/file filename) (io/file new-filename))))
+
+(defmethod execute :label [_ {[filename & labels] :args}]
+  (update-frontmatter filename (partial apply update) :labels (fnil conj #{}) labels))
+
+(defmethod execute :wont [_ {[filename] :args}]
+  (update-frontmatter filename assoc :status "wont" :wont (fmt-date (ld/now))))
+
 (defmethod execute :done [_ {[filename] :args}]
-  (let [path (slurp filename)
-        [fm content] (markdown/frontmatter+content path)
-        fm (assoc fm :status "done" :done (fmt-date (ld/now)))]
-    (spit filename (str "---\n"
-                        (yaml/generate-string fm :dumper-options {:flow-style :block})
-                        "---\n"
-                        content))))
+  (update-frontmatter filename assoc :status "done" :done (fmt-date (ld/now))))
 
 ; TODO add `list` sub-command that shows titles from file content
   ; TODO indicate states of items
