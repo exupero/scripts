@@ -10,7 +10,9 @@
   (let [[target] *command-line-args*]
     (if (nil? target)
       (print (str (local/find-repo-root)))
-      (if-let [{:keys [tag form]} (dirs (symbol target))]
-        (let [f (ns-resolve (find-ns 'local) tag)]
-          (print (str (f form))))
+      (if-let [result (dirs (symbol target))]
+        (if (get result :tag)
+          (let [f (ns-resolve (find-ns 'local) (get result :tag))]
+            (print (str (f (get result :form)))))
+          (print result))
         (System/exit 1)))))
