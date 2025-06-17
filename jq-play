@@ -1,0 +1,32 @@
+#!/bin/bash
+
+# A poor man's 'fx' or 'qq -I' using 'fzf', inspired by https://jvns.ca/til/fzf-preview-git-commits/ but takes input
+# from stdin rather than a file.
+
+inputFile=$(mktemp)
+trap "rm -f '$inputFile'" EXIT
+cat > "$inputFile"
+
+starterQueries="
+.
+keys
+length
+type
+. | keys
+. | length
+. | type
+.[0]
+.[]
+"
+
+result=$(echo "$starterQueries" | fzf --print-query \
+  --prompt 'jq> ' \
+  --header="Type jq expressions to explore JSON data. Press Enter to execute." \
+  --preview "jq -C {q} '$inputFile' 2>&1" \
+  --preview-window=up:80% \
+  --bind="enter:accept" \
+  --bind="ctrl-p:execute(jq -C {q} '$inputFile' | less -R)" \
+  --bind="ctrl-y:execute-silent(jq {q} '$inputFile' | pbcopy)" \
+  --header-lines=0)
+query=$(echo "$result" | head -n1)
+jq -C "$query" $inputFile

@@ -2,23 +2,30 @@
 
 (ns scratch
   (:require [clojure.java.io :as io]
+            [clojure.tools.cli :as cli]
             selmer.parser
-            cli
             config
             [time :as t]))
 
 (def scratchpad-path (System/getenv "SCRATCHPADS_PATH"))
 
-(cli/with-opts [[[-d --dir scratchpad-path "directory to create file in; defaults to $SCRATCHPADS_PATH"]
-                 [-E --no-extension "don't create the file with an extension"]
-                 [-t --type "clj" "extension of scratch file; defaults to 'clj'"]]
-                [nmsp]]
-  (let [template (config/content (str "scratch-template-" type ".txt"))
-        file (io/file (or dir scratchpad-path)
-                      (cond-> (str nmsp)
-                        (not no-extension) (str \. type)))]
-    (when-not (.exists file)
-      (spit file (selmer.parser/render template
-                   {:namespace nmsp
-                    :today (t/isoformat-today)})))
-    (print (.getAbsolutePath file))))
+(def cli-opts
+  [["-d" "--dir NAME" "path to create scratchpad in"]
+   ["-E" "--no-extension" "do not create the file with an extension"]
+   ["-t" "--type EXTENSION" "extension of scratch file; defaults to 'clj'"]
+   [nil "--timestamp" "include the time of creation in the filename"]])
+
+(let [{{:keys [dir no-extension type timestamp]} :options [nmsp] :arguments}
+      , (cli/parse-opts *command-line-args* cli-opts)
+      template (config/content (str "scratch-template-" type ".txt"))
+      timestamp (t/format-as (t/now) "yyyy-MM-dd'T'HH-mm-ssXX")
+      file (io/file (or dir scratchpad-path)
+                    (cond-> ""
+                      timestamp          , (->> (str timestamp \-))
+                      true               , (str nmsp)
+                      (not no-extension) , (str \. type)))]
+  (when-not (.exists file)
+    (spit file (selmer.parser/render template
+                 {:namespace nmsp
+                  :today (t/isoformat-today)})))
+  (print (.getAbsolutePath file)))
