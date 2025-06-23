@@ -1,0 +1,17 @@
+#!/bin/bash
+
+set -e
+
+target=$1
+shift
+cmd=$*
+
+# Ensure pane is not zoomed
+if tmux list-panes -t "$target" -F '#F' | grep -q "Z"; then
+  tmux resize-pane -t "$target" -Z
+fi
+
+# Ensure pane is not in copy mode
+tmux send -t "$target" -X cancel 2>/dev/null || true
+
+tmux send -t "$target" "$*" C-m
