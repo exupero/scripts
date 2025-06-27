@@ -10,9 +10,6 @@
   (:import [java.net URLDecoder]))
 (pods/load-pod 'org.babashka/fswatcher "0.0.5")
 (require '[pod.babashka.fswatcher :as fw])
-(pods/load-pod 'org.babashka/fswatcher "0.0.5")
-(pods/load-pod 'org.babashka/fswatcher "0.0.5")
-(pods/load-pod 'org.babashka/fswatcher "0.0.5")
 
 ;; A simple mime type utility from https://github.com/ring-clojure/ring/blob/master/ring-core/src/ring/util/mime_type.clj
 (def ^{:doc "A map of file extensions to mime-types."}
@@ -184,7 +181,7 @@ function listenOnWebsocket() {
   listen();
 }
 listenOnWebsocket();
-                                    </script></head>"))
+</script></head>"))
 
 (def path->channels (atom {}))
 
@@ -204,10 +201,15 @@ listenOnWebsocket();
         (println "Changes to" (str path))
         (let [k (-> path
                     (str/replace (re-pattern (str "^" dir)) "")
-                    (str/replace #"/(index\.html)?$" ""))
-              content (slurp path)]
-          (doseq [ch (@path->channels k)]
-            (server/send! ch content)))))
+                    (str/replace #"/?(index\.html)?$" ""))
+              content (try
+                        (slurp path)
+                        (catch Exception e
+                          (println (str "Error reading file " path ": " (.getMessage e)))
+                          nil))]
+          (when content
+            (doseq [ch (@path->channels k)]
+              (server/send! ch content))))))
     {:recursive true}))
 
 (defn serve [{:keys [port dir open live-reload]}]
