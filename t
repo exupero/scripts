@@ -2,6 +2,7 @@
 
 (ns t
   (:require [clojure.java.io :as io]
+            [clojure.pprint :as pprint]
             [clojure.string :as str]
             [babashka.deps :as deps]
             [babashka.process :as p]
@@ -57,6 +58,13 @@
                "---\n"
                content))))
 
+(defn title [content]
+  (-> content
+      str/split-lines
+      (->> (filter (partial re-find #"^# ")))
+      first
+      (subs 2)))
+
 (defmulti execute (fn [cmd _] cmd))
 
 (defmethod execute :init [_ {:keys [dir]}]
@@ -64,6 +72,24 @@
   (ensure-directory! (str dir "/_templates"))
   (spit (str dir "/_templates/generic.md")
         "---\ncreated: {{datestamp}}\ntype: {{type}}\n---\n\n# {{title|safe}}"))
+
+(defmethod execute :list [_ {[status] :args :keys [dir]}]
+  (let [files (->> (io/file dir)
+                   .listFiles
+                   (sequence
+                     (comp
+                       (remove #(.isDirectory %))
+                       (map (fn [file]
+                              (let [[{:keys [created type status]} content] (markdown/frontmatter+content (slurp file))]
+                                {:created (.format (SimpleDateFormat. "yyyy-MM-dd") created)
+                                 :type type
+                                 :status (or status "todo")
+                                 :title (title content)})))
+                       (if status
+                         (filter (comp #{status} :status))
+                         (comp)))))]
+    (doseq [{:keys [created type status title]} files]
+      (println (format "%s %-7s %s %s" created type status title)))))
 
 (defmethod execute :add [_ {[type] :args :keys [dir]}]
   (let [type (types (keyword type))
@@ -76,22 +102,14 @@
                                        :type type})
         file (edit-tempfile dir content)
         edited-content (slurp file)
-        title (-> edited-content
-                  str/split-lines
-                  (->> (filter (partial re-find #"^# ")))
-                  first
-                  (subs 2))
+        title (title edited-content)
         filename (str dir "/" datestamp "-" type "-" (slug title) ".md")]
     (spit filename edited-content)))
 
 (defmethod execute :rename [_ {[filename] :args :keys [dir]}]
   (let [[{:keys [created type]} content] (markdown/frontmatter+content (slurp filename))
         datestamp (.format (SimpleDateFormat. "yyyy-MM-dd") created)
-        title (-> content
-                  str/split-lines
-                  (->> (filter (partial re-find #"^# ")))
-                  first
-                  (subs 2))
+        title (title content)
         new-filename (str dir "/" datestamp "-" type "-" (slug title) ".md")]
     (.renameTo (io/file filename) (io/file new-filename))))
 
@@ -103,10 +121,6 @@
 
 (defmethod execute :done [_ {[filename] :args}]
   (update-frontmatter filename assoc :status "done" :done (fmt-date (ld/now))))
-
-; TODO add `list` sub-command that shows titles from file content
-  ; TODO indicate states of items
-  ; TODO include option to filter items by status
 
 (when (= *file* (System/getProperty "babashka.file"))
   (let [[cmd & args] *command-line-args*
