@@ -2,9 +2,10 @@
 
 set -e
 
-target=$1
-shift
 cmd=$*
+
+# Find the non-active pane
+target=.$(tmux list-panes -F '#{pane_active} #{pane_index}' | grep -v '^1 ' | cut -d' ' -f2 | head -n 1)
 
 # Ensure pane is not zoomed
 if tmux list-panes -t "$target" -F '#F' | grep -q "Z"; then
