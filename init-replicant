@@ -6,12 +6,13 @@ npm init -y
 npm install --save-dev shadow-cljs
 
 mkdir -p \
-  src/main/$name \
-  src/dev \
-  src/test \
+  .github/workflows \
   resources/public \
   portfolio/resources/public \
-  portfolio/src
+  portfolio/src \
+  src/dev \
+  src/main/$name \
+  src/test
 
 cat << EOF > deps.edn
 {:paths ["src/dev" "src/main" "src/test" "resources"]
@@ -66,6 +67,11 @@ EOF
 cat << EOF > resources/public/style.css
 * {
   box-sizing: border-box;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
 }
 EOF
 
@@ -169,7 +175,39 @@ cat << EOF > portfolio/src/portfolio.cljs
      {:css-paths ["/style.css"]}}))
 EOF
 
+cat << EOF > .github/workflows/deploy.yml
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches:
+    - main
+  workflow_dispatch:
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout the main branch
+      uses: actions/checkout@v4
+      with:
+        ref: main
+    - name: Install clojure tools
+      uses: DeLaGuardo/setup-clojure@11.0
+      with:
+        cli: latest
+    - name: Install deps
+      run: npm install
+    - name: Build release
+      run: npx shadow-cljs release app
+    - name: Deploy
+      uses: JamesIves/github-pages-deploy-action@v4
+      with:
+        folder: resources/public
+EOF
+
 git add -- \
+  .github \
   .gitignore \
   package.json \
   bb.edn \
