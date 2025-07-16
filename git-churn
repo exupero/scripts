@@ -1,26 +1,39 @@
 #!/usr/bin/env bb
 
 (ns git-churn
-  (:require [clojure.java.shell :refer [sh]]
-            [clojure.java.io :as io]
-            [clojure.string :as string]))
+  (:require [clojure.java.io :as io]
+            clojure.pprint
+            [clojure.string :as str]
+            [clojure.tools.cli :as cli]
+            [babashka.process :as p]))
 
-(let [dir (System/getProperty "user.dir")]
-  (-> (sh "git" "log" "--oneline" "--pretty=format:%h" :dir dir)
-      :out
-      string/split-lines
-      (->> (mapcat (fn [sha]
-                     (-> (sh "git" "diff-tree" "--no-commit-id" "--name-only" "-r" sha :dir dir)
-                         :out
-                         string/split-lines))))
-      (->> (filter (fn [filename]
-                     (let [file (io/file (str dir "/" filename))]
-                       (and (.exists file)
-                            (not (.isDirectory file))
-                            (not (re-find #"\.(pkl|zip)$" (.getName file))))))))
-      frequencies
-      (->> (map (fn [[file commits]]
-                  {:file file
-                   :commits commits
-                   :lines (-> (str dir "/" file) slurp string/split-lines count)})))
-      (->> (sort-by :commits >))))
+(def cli-opts
+  [["-x" "--exclude PATTERN" "exclude filenames matching a pattern"
+    :id :excludes
+    :default #{}
+    :multi true
+    :update-fn conj]])
+
+(let [{{:keys [excludes]} :options} (cli/parse-opts *command-line-args* cli-opts)
+      cmd (cond-> ["git" "log" "--name-only" "--pretty=format:"]
+            excludes (as-> $ (apply conj $ "--" (map #(str ":!" % "") excludes))))]
+  (->> (apply p/shell {:out :string} cmd)
+       :out
+       str/split-lines
+       (remove str/blank?)
+       frequencies
+       (filter (fn [[path]]
+                 (let [file (io/file path)]
+                   (and (.exists file)
+                        (not (.isDirectory file))
+                        (not (re-find #"\.(pkl|zip)$" (.getName file)))))))
+       (map (fn [[path commits]]
+              (let [lines (-> (slurp path) str/split-lines count)]
+                {:file path
+                 :commits commits
+                 :lines lines
+                 :commits-per-line (float (/ commits (max 1 lines)))
+                 :lines-per-commit (float (/ lines commits))})))
+       (sort-by :commits-per-line >)
+       (take 10)
+       clojure.pprint/print-table))
