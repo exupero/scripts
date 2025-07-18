@@ -17,6 +17,7 @@ mkdir -p \
 cat << EOF > deps.edn
 {:paths ["src/dev" "src/main" "src/test" "resources"]
  :deps {hashp/hashp {:mvn/version "0.2.2"}
+        no.cjohansen/nexus {:mvn/version "2025.07.1"}
         no.cjohansen/replicant {:mvn/version "2025.03.27"}
         org.clojure/clojure {:mvn/version "1.12.0"}
         thheller/shadow-cljs {:mvn/version "2.11.23"}}
@@ -103,19 +104,20 @@ EOF
 
 cat << EOF > src/main/$name/app.cljs
 (ns $name.app
-  (:require [replicant.dom :as r]
+  (:require [nexus.registry :as nxr]
+            [replicant.dom :as r]
             $name.db
             $name.events
             $name.ui))
 
 (defonce el (js/document.getElementById "app"))
 
-(r/set-dispatch! $name.events/dispatch!)
-
 (defn ^:dev/after-load render []
   (r/render el ($name.ui/main @$name.db/store)))
 
 (defn init []
+  (nxr/register-system->state! deref)
+  (r/set-dispatch! #(nxr/dispatch $name.db/store %1 %2))
   (render)
   (add-watch $name.db/store ::render
              (fn [_ _ _ state]
@@ -130,10 +132,12 @@ EOF
 
 cat << EOF > src/main/$name/events.cljs
 (ns $name.events
-  (:require $name.db))
+  (:require $name.db
+            [nexus.registry :as nxr]))
 
-(defn dispatch! [event-data handler-data]
-  #p [event-data handler-data])
+(nxr/register-placeholder! :event.target/value
+  (fn [{:replicant/keys [dom-event]}]
+    (some-> dom-event .-target .-value)))
 EOF
 
 cat << EOF > src/main/$name/ui.cljs
