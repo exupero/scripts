@@ -8,7 +8,7 @@
             [babashka.pods :as pods]
             [org.httpkit.server :as server])
   (:import [java.net URLDecoder]))
-(pods/load-pod 'org.babashka/fswatcher "0.0.5")
+(pods/load-pod 'org.babashka/fswatcher "0.0.7")
 (require '[pod.babashka.fswatcher :as fw])
 
 ;; A simple mime type utility from https://github.com/ring-clojure/ring/blob/master/ring-core/src/ring/util/mime_type.clj
@@ -168,6 +168,7 @@ function resetHtml(content) {
 function listenOnWebsocket() {
   const listen = () => {
     const conn = new WebSocket(`ws://\\${window.location.host}\\${window.location.pathname}`);
+    console.log(`Listening for changes to \\${window.location.pathname}`);
     conn.onopen = () => console.log(`Socket connected to server`);
     conn.onclose = () => {
       console.warn(`Socket to server closed; retrying...`);
@@ -200,7 +201,7 @@ listenOnWebsocket();
       (when-not (str/ends-with? path "~")
         (println "Changes to" (str path))
         (let [k (-> path
-                    (str/replace (re-pattern (str "^" dir)) "")
+                    (cond-> (str/starts-with? path dir) (subs (count dir)))
                     (str/replace #"/?(index\.html)?$" ""))
               content (try
                         (slurp path)
