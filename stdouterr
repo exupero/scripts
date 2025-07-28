@@ -1,0 +1,27 @@
+#!/usr/bin/env bb
+
+(ns stdouterr
+  (:require [clojure.java.io :as io]
+            [babashka.deps :as deps]
+            [babashka.process :as p]))
+(deps/add-deps '{:deps {io.github.paintparty/bling {:mvn/version "0.4.2"}}})
+(require '[bling.core :as bling])
+
+(let [command *command-line-args*
+      {:keys [out err]} (apply p/process {:in *in*} command)
+      print-lock (Object.)]
+  (with-open [out-rdr (io/reader out)
+              err-rdr (io/reader err)]
+    (future
+      (loop []
+        (when-let [line (.readLine out-rdr)]
+          (locking print-lock
+            (println (bling/bling [:green "OUT: "] line)))
+          (recur))))
+    (future
+      (loop []
+        (when-let [line (.readLine err-rdr)]
+          (locking print-lock
+            (println (bling/bling [:yellow "ERR: "] line)))
+          (recur))))
+    @(promise)))
