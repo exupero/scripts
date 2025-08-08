@@ -1,0 +1,396 @@
+#!/usr/bin/env bb
+; vim: set filetype=clojure
+
+; Statite - a stationary satellite; also a static site generator
+
+(ns statite
+  (:require [clojure.edn :as edn]
+            [clojure.java.io :as io]
+            [clojure.string :as str]
+            [babashka.deps :as deps]
+            [babashka.pods :as pods]
+            [babashka.process :as p]
+            [clj-yaml.core :as yaml]
+            [hiccup2.core :as hiccup]
+            selmer.parser)
+  (:import [java.util.concurrent LinkedBlockingQueue]))
+(deps/add-deps '{:deps {markdown-clj/markdown-clj {:mvn/version "1.11.4"}
+                        org.babashka/sci {:mvn/version "0.9.45"}}})
+(pods/load-pod 'org.babashka/fswatcher "0.0.5")
+(require '[markdown.core :as md]
+         '[pod.babashka.fswatcher :as fw]
+         '[sci.core :as sci])
+(pods/load-pod 'org.babashka/fswatcher "0.0.5")
+(pods/load-pod 'org.babashka/fswatcher "0.0.5")
+(pods/load-pod 'org.babashka/fswatcher "0.0.5")
+
+(def template-index
+  "<!DOCTYPE html>
+<head>
+  <title>{{title}}</title>
+  <link rel=\"stylesheet\" href=\"/css/style.css\">
+</head>
+<body>
+  <h1>{{title}}</h1>
+  <ul>
+    {% for page in pages %}
+    <li><a href=\"{{page.slug}}\">{{page.title}}</a></li>
+    {% endfor %}
+  </ul>
+</body>")
+
+(def template-page
+  "<!DOCTYPE html>
+<head>
+  <title>{{title}}</title>
+  <link rel=\"stylesheet\" href=\"/css/style.css\">
+</head>
+<body>
+  {{content}}
+</body>")
+
+(def render-queue (LinkedBlockingQueue.))
+
+(defn do-renders []
+  (while true
+    (try
+      (let [task (.take render-queue)]
+        (task))
+      (catch Exception e
+        (println "Error during render:" e)))))
+
+(defn watch* [build path type]
+  (when (and path
+             (not (str/ends-with? path "~"))
+             (#{:create :rename} type))
+    (build (io/file path))))
+
+(defn watch! [builders]
+  (let [watchers (volatile! [])]
+    (doseq [[dir build] builders]
+      (println "Watching for changes in" (str (name dir) "/"))
+      (vswap! watchers conj
+              (fw/watch (name dir)
+                        (fn [{:keys [path type]}]
+                          (watch* build path type))
+                        {:recursive true
+                         :delay-ms 500})))
+    (try
+      (do-renders)
+      (finally
+        (println "Stopping watchers")
+        (doseq [watcher @watchers]
+          (fw/unwatch watcher))))))
+
+(defn parse-frontmatter [fm]
+  (->> fm
+       (map #(subs % 3))
+       (str/join "\n")
+       yaml/parse-string))
+
+(defn frontmatter [content]
+  (->> content
+       str/split-lines
+       (take-while #(re-find #"^;; " %))
+       parse-frontmatter))
+
+(defn frontmatter+content [content]
+  (let [[fm lines] (->> content str/split-lines (split-with #(re-find #"^;; " %)))]
+    [(parse-frontmatter fm)
+     lines]))
+
+(defn slugify [s]
+  (-> s
+      (str/replace #"\.[a-z]{2,4}$" "")))
+
+(defn write-cache* [slug html]
+  (spit (io/file "cache" (str slug ".html")) html))
+
+(defn read-cache* [slug]
+  (slurp (io/file "cache" (str slug ".html"))))
+
+(defn write-build* [slug fm html]
+  (.mkdir (io/file "build" slug))
+  (spit (io/file "build" slug "index.html")
+        (selmer.parser/render (slurp "templates/page.html")
+                              (assoc fm :content [:safe html]))))
+
+(defn write-index* [pages]
+  (spit (io/file "build" "index.html")
+        (selmer.parser/render (slurp "templates/index.html")
+                              {:pages pages})))
+
+(defn format-markdown [lines]
+  (->> lines
+       (map #(if (re-find #"^; " %)
+               (subs % 2)
+               %))
+       (str/join "\n")))
+
+(defn format-clojure [lines]
+  (str/join "\n" lines))
+
+(defn sections [formatters]
+  (let [section (volatile! [])
+        typ (volatile! :markdown)]
+    (fn [rf]
+      (fn
+        ([] (rf))
+        ([res]
+         (let [fmt (formatters @typ)]
+           (rf (rf res {:type @typ :content (fmt @section)}))))
+        ([res line]
+         (let [new-type (cond
+                          (= "" line)           , @typ
+                          (re-find #"^; " line) , :markdown
+                          :else                 , :clojure)]
+           (if (= new-type @typ)
+             (do
+               (vswap! section conj line)
+               res)
+             (let [lines @section
+                   t @typ
+                   fmt (formatters t)]
+               (vreset! section [line])
+               (vreset! typ new-type)
+               (rf res {:type t :content (fmt lines)})))))))))
+
+(defn parse-code
+  ([s] (parse-code s {}))
+  ([s data-readers]
+   (let [rdr (clojure.lang.LineNumberingPushbackReader. (java.io.StringReader. s))]
+     (binding [*data-readers* data-readers]
+       (loop [forms []]
+         (let [[form source] (read+string rdr false ::eof)]
+           (if (identical? form ::eof)
+             forms
+             (recur (conj forms {:form form :source source})))))))))
+
+(defn parse-sections [lines]
+  (sequence
+    (sections {:markdown format-markdown
+               :clojure  (comp parse-code format-clojure)})
+    lines))
+
+(defn read-char [rdr]
+  (let [c (.read rdr)]
+    (when-not (= c -1)
+      (char c))))
+
+(defn read-form [rdr]
+  (let [[form] (read+string rdr false :eof)]
+    (when-not (identical? form ::eof)
+      form)))
+
+(defn interpolate [md ctx]
+  (let [rdr (clojure.lang.LineNumberingPushbackReader. (java.io.StringReader. md))]
+    (loop [result ""]
+      (let [c (read-char rdr)]
+        (condp = c
+          nil result
+          \\ (let [c2 (read-char rdr)]
+               (if (= c2 \~)
+                 (recur (str result c2))
+                 (recur (str result c c2))))
+          \~ (if-let [c2 (read-char rdr)]
+               (if (= c2 \{)
+                 (if-let [form (read-form rdr)]
+                   (if-let [c3 (read-char rdr)]
+                     (if (= c3 \})
+                       (let [value (sci/eval-form ctx form)]
+                         (recur (str result value)))
+                       (recur result)))
+                   (recur result))
+                 (recur (str result c c2)))
+               (str result c))
+          (recur (str result c)))))))
+
+(defn add-deps! []
+  (deps/add-deps {:deps (:deps (edn/read-string (slurp "deps.edn")))}))
+
+(defn ns-loader [{:keys [namespace]}]
+  (let [file (io/file "pages" (str namespace ".clj"))]
+    (when (.exists file)
+      {:filename (.getAbsolutePath file)
+       :source (slurp file)})))
+
+(defn sci-ns [sym]
+  (require sym)
+  (let [ens (sci/create-ns sym)
+        publics (ns-publics sym)
+        sci-ns (update-vals publics #(sci/copy-var* % ens))]
+    sci-ns))
+
+(defmacro with-ns [[ns-name ctx] & body]
+  `(let [ctx# ~ctx
+         original-ns# (sci/eval-form ctx# '(str *ns*))]
+     (sci/eval-form ctx# (list 'ns (symbol ~ns-name)))
+     (try
+       ~@body
+       (finally
+         (sci/eval-form ctx# (list 'ns (symbol original-ns#)))))))
+
+(defn eval-sections [ns-name sections]
+  (add-deps!)
+  (let [config (edn/read-string (slurp "statite.edn"))
+        sci-opts {:namespaces (or (some->> (get-in config [:sci :namespaces])
+                                           (into {} (map (juxt identity sci-ns))))
+                                  {})
+                  :classes {}
+                  :load-fn ns-loader}
+        ctx (-> (sci/init sci-opts)
+                (update :namespaces assoc (symbol ns-name) {}))]
+    (with-ns [ns-name ctx]
+      (try
+        (mapcat (fn [{:keys [type content]}]
+                  (condp = type
+                    :markdown [{:html (-> content
+                                          (interpolate ctx)
+                                          md/md-to-html-string)}]
+                    :clojure (doall
+                               (for [{:keys [form source]} content
+                                     :let [m (or (meta form) {})
+                                           value (when-not (m :code)
+                                                   (sci/eval-form ctx form))]
+                                     :when (not (m :hidden))]
+                                 {:source source
+                                  :form form
+                                  :meta (merge m (meta value))
+                                  :value value}))))
+                sections)
+        (catch Exception e
+          (println "Error evaluating sections:" e))))))
+
+(defn web-components [hiccup]
+  (into #{}
+        (comp
+          (filter vector?)
+          (keep (comp (partial re-find #"^[A-Za-z0-9]+-[A-Za-z0-9-]+") name first)))
+        (tree-seq vector? seq hiccup)))
+
+(defn render-section [{{:keys [render html]} :meta :keys [value] :as section}]
+  (or (when html
+        {:html (hiccup/html value)
+         :components (web-components value)})
+      (when render
+        (let [rendered (render value)]
+          (if (-> rendered meta :html)
+            {:html (hiccup/html rendered)
+             :components (web-components rendered)}
+            {:html (pr-str rendered)})))
+      section))
+
+(defn render [ns-name content-lines]
+  (let [sections (->> content-lines
+                      parse-sections
+                      (eval-sections ns-name)
+                      (map render-section))
+        html (transduce
+                (comp
+                  (map :html)
+                  (interpose "\n"))
+                str sections)
+        components (transduce
+                     (comp
+                       (mapcat :components)
+                       (distinct)
+                       (map #(str/replace % #"-" "_"))
+                       (filter #(.exists (io/file (str "build/components/" % ".js"))))
+                       (map #(str "<script src=\"/components/" % ".js\"></script>"))
+                       (interpose "\n"))
+                     str sections)]
+    (str html "\n" components)))
+
+(defn build-page [file]
+  (println "Page changed" (.getName file))
+  ; SCI evals that set *ns* have to be run from the main thread
+  (.put render-queue
+        (fn []
+          (println "Building" (.getName file))
+          (try
+            (let [slug (slugify (.getName file))
+                  [fm content-lines] (frontmatter+content (slurp file))
+                  html (render slug content-lines)]
+              (write-cache* slug html)
+              (write-build* slug fm html))
+            (catch Exception e
+              (println "Error building page" (.getName file) ":" e))))))
+
+(defn build-component [file]
+  (when (str/ends-with? (.getName file) ".cljs")
+    (println "Building component" (.getName file))
+    (let [nm (str/replace (.getName file) #"\.cljs$" "")]
+      (try
+        (p/shell "npx squint compile" (.getAbsolutePath file))
+        (p/shell "npx esbuild" (str "components/modules/" nm ".mjs")
+                 "--bundle"
+                 "--minify"
+                 "--platform=browser"
+                 "--tree-shaking=true"
+                 "--outdir=build/components")
+        (catch Exception e
+          (println "Error building component" nm ":" e))))))
+
+(defn copy-to [dest]
+  (fn [file]
+    (println "Copying" (.getName file))
+    (io/copy file (io/file "build" dest (.getName file)))))
+
+(defn rebuild-pages-from-cache [_]
+  (let [pages (->> (file-seq (io/file "pages"))
+                   (remove #(.isDirectory %))
+                   (map (fn [file]
+                          {:file file
+                           :slug (slugify (.getName file))
+                           :frontmatter (frontmatter (slurp file))})))]
+    (println "Rebuilding pages from cache")
+    (doseq [{:keys [slug frontmatter]} pages]
+      (write-build* slug frontmatter (read-cache* slug)))
+    (println "Rebuilding index")
+    (write-index* pages)))
+
+(defn help [& lines]
+  (binding [*out* *err*]
+    (doseq [line lines]
+      (println line))))
+
+(defmulti execute (fn [cmd _] (keyword cmd)))
+
+(defmethod execute :default [_ _]
+  (help
+    "Unknown command. Available commands:"
+    "  watch - start watching for changes and build files"
+    "  help  - show this message"))
+
+(defmethod execute :help [_ _]
+  (help
+    "Available commands:"
+    "  watch - start watching for changes and build files"
+    "  help  - show this message"))
+
+(defmethod execute :init [_ _]
+  (let [templates-dir (io/file "templates")]
+    (.mkdir "components")
+    (.mkdir templates-dir)
+    (spit (io/file templates-dir "index.html") template-index)
+    (spit (io/file templates-dir "page.html") template-page)
+    (spit "statite.edn" "{}")
+    (spit "squint.edn" "{:paths [\"components\"]\n :output-dir \"components/modules\"}")
+    (p/shell "npm install --save-dev esbuild squint-cljs")))
+
+(defmethod execute :watch [_ _]
+  (.mkdir (io/file "build"))
+  (.mkdir (io/file "build" "components"))
+  (.mkdir (io/file "build" "css"))
+  (.mkdir (io/file "build" "images"))
+  (.mkdir (io/file "build" "js"))
+  (.mkdir (io/file "cache"))
+  (watch! {:components build-component
+           :css (copy-to "css")
+           :images (copy-to "images")
+           :pages build-page
+           :templates rebuild-pages-from-cache}))
+
+(when (= *file* (System/getProperty "babashka.file"))
+  (let [[subcmd & args] *command-line-args*]
+    (execute subcmd args)))

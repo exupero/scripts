@@ -211,7 +211,8 @@ listenOnWebsocket();
           (when content
             (doseq [ch (@path->channels k)]
               (server/send! ch content))))))
-    {:recursive true}))
+    {:recursive true
+     :delay-ms 500}))
 
 (defn serve [{:keys [port dir open live-reload]}]
   (assert (fs/directory? dir) (str "The given path `" dir "` is not a directory."))
