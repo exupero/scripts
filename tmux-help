@@ -1,0 +1,19 @@
+#!/usr/bin/env bb
+
+(ns tmux-help
+  (:require [clojure.string :as str]
+            [babashka.process :as p]))
+
+(let [[cmd] *command-line-args*
+      regex (re-pattern (str #"^     " cmd #" \["))
+      lines (->> (p/shell {:out :string} "bash -c 'man tmux | col -bx'")
+                 :out
+                 str/split-lines
+                 (drop-while (complement #(re-find regex %))))
+      head (first lines)
+      tail (->> lines
+                (drop 1)
+                (take-while (complement #(re-find #"^     [^ ]" %)))
+                (str/join "\n"))]
+  (println head)
+  (println tail))
