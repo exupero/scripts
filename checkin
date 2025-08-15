@@ -30,4 +30,5 @@
                      "zsh")
             (p/shell {:dir repo :continue true} "git commit -m 'Check in'")
             (when (git/origin repo)
+              (p/shell {:dir repo :continue true} "git pull -p --rebase")
               (p/shell {:dir repo :continue true} "git push -u origin"))))))))

@@ -200,17 +200,18 @@ listenOnWebsocket();
     (fn [{:keys [path]}]
       (when-not (str/ends-with? path "~")
         (println "Changes to" (str path))
-        (let [k (-> path
-                    (cond-> (str/starts-with? path dir) (subs (count dir)))
-                    (str/replace #"/?(index\.html)?$" ""))
-              content (try
-                        (slurp path)
-                        (catch Exception e
-                          (println (str "Error reading file " path ": " (.getMessage e)))
-                          nil))]
-          (when content
-            (doseq [ch (@path->channels k)]
-              (server/send! ch content))))))
+        (when-not (fs/directory? path)
+          (let [k (-> path
+                      (cond-> (str/starts-with? path dir) (subs (count dir)))
+                      (str/replace #"/?(index\.html)?$" ""))
+                content (try
+                          (slurp path)
+                          (catch Exception e
+                            (println (str "Error reading file " path ": " (.getMessage e)))
+                            nil))]
+            (when content
+              (doseq [ch (@path->channels k)]
+                (server/send! ch content)))))))
     {:recursive true
      :delay-ms 500}))
 

@@ -7,6 +7,7 @@
   (:require [clojure.edn :as edn]
             [clojure.java.io :as io]
             [clojure.string :as str]
+            [clojure.walk :as walk]
             [babashka.deps :as deps]
             [babashka.pods :as pods]
             [babashka.process :as p]
@@ -28,6 +29,7 @@
   "<!DOCTYPE html>
 <head>
   <title>{{title}}</title>
+  <meta charset=\"UTF-8\">
   <link rel=\"stylesheet\" href=\"/css/style.css\">
 </head>
 <body>
@@ -43,6 +45,7 @@
   "<!DOCTYPE html>
 <head>
   <title>{{title}}</title>
+  <meta charset=\"UTF-8\">
   <link rel=\"stylesheet\" href=\"/css/style.css\">
 </head>
 <body>
@@ -63,7 +66,10 @@
   (when (and path
              (not (str/ends-with? path "~"))
              (#{:create :rename} type))
-    (build (io/file path))))
+    (try
+      (build (io/file path))
+      (catch Exception e
+        (println "Error building" path ":" e)))))
 
 (defn watch! [builders]
   (let [watchers (volatile! [])]
@@ -206,13 +212,21 @@
           (recur (str result c)))))))
 
 (defn add-deps! []
-  (deps/add-deps {:deps (:deps (edn/read-string (slurp "deps.edn")))}))
+  (let [{clj :deps} (edn/read-string (slurp "deps.edn"))
+        {bb :deps} (edn/read-string (slurp "bb.edn"))]
+    (deps/add-deps {:deps (merge clj bb)})))
 
 (defn ns-loader [{:keys [namespace]}]
-  (let [file (io/file "pages" (str namespace ".clj"))]
-    (when (.exists file)
-      {:filename (.getAbsolutePath file)
-       :source (slurp file)})))
+  (let [files [(io/file "pages" (str namespace ".clj"))
+               (-> namespace
+                   (str/replace #"\." "/")
+                   (as-> $ (str "src/" $ ".clj"))
+                   io/file)]]
+    (some (fn [file]
+            (when (.exists file)
+              {:filename (.getAbsolutePath file)
+               :source (slurp file)}))
+          files)))
 
 (defn sci-ns [sym]
   (require sym)
@@ -221,26 +235,30 @@
         sci-ns (update-vals publics #(sci/copy-var* % ens))]
     sci-ns))
 
-(defmacro with-ns [[ns-name ctx] & body]
+(defmacro with-ns [[nm requires] ctx & body]
   `(let [ctx# ~ctx
-         original-ns# (sci/eval-form ctx# '(str *ns*))]
-     (sci/eval-form ctx# (list 'ns (symbol ~ns-name)))
+         original-ns# (sci/eval-form ctx# '(str *ns*))
+         requires# ~requires]
+     (sci/eval-form ctx# (list 'ns (symbol ~nm)
+                               (list* :require requires#)))
      (try
        ~@body
        (finally
          (sci/eval-form ctx# (list 'ns (symbol original-ns#)))))))
 
-(defn eval-sections [ns-name sections]
+(defn eval-sections [nm sections]
   (add-deps!)
   (let [config (edn/read-string (slurp "statite.edn"))
         sci-opts {:namespaces (or (some->> (get-in config [:sci :namespaces])
                                            (into {} (map (juxt identity sci-ns))))
                                   {})
-                  :classes {}
+                  :classes (or (some->> (get-in config [:sci :classes])
+                                        (into {} (map (juxt identity resolve))))
+                               {})
                   :load-fn ns-loader}
         ctx (-> (sci/init sci-opts)
-                (update :namespaces assoc (symbol ns-name) {}))]
-    (with-ns [ns-name ctx]
+                (update :namespaces assoc (symbol nm) {}))]
+    (with-ns [nm (config :require)] ctx
       (try
         (mapcat (fn [{:keys [type content]}]
                   (condp = type
@@ -268,14 +286,23 @@
           (keep (comp (partial re-find #"^[A-Za-z0-9]+-[A-Za-z0-9-]+") name first)))
         (tree-seq vector? seq hiccup)))
 
+(defn render-html [value]
+  (hiccup/html
+    (clojure.walk/postwalk
+      (fn [node]
+        (if (ratio? node)
+          (float node)
+          node))
+      value)))
+
 (defn render-section [{{:keys [render html]} :meta :keys [value] :as section}]
   (or (when html
-        {:html (hiccup/html value)
+        {:html (render-html value)
          :components (web-components value)})
       (when render
         (let [rendered (render value)]
           (if (-> rendered meta :html)
-            {:html (hiccup/html rendered)
+            {:html (render-html rendered)
              :components (web-components rendered)}
             {:html (pr-str rendered)})))
       section))
@@ -340,9 +367,9 @@
   (let [pages (->> (file-seq (io/file "pages"))
                    (remove #(.isDirectory %))
                    (map (fn [file]
-                          {:file file
-                           :slug (slugify (.getName file))
-                           :frontmatter (frontmatter (slurp file))})))]
+                          (merge (frontmatter (slurp file))
+                                 {:file file
+                                  :slug (slugify (.getName file))}))))]
     (println "Rebuilding pages from cache")
     (doseq [{:keys [slug frontmatter]} pages]
       (write-build* slug frontmatter (read-cache* slug)))
@@ -353,6 +380,10 @@
   (binding [*out* *err*]
     (doseq [line lines]
       (println line))))
+
+(defn ensure-file! [file content]
+  (when-not (.exists (io/file file))
+    (spit file content)))
 
 (defmulti execute (fn [cmd _] (keyword cmd)))
 
@@ -372,10 +403,11 @@
   (let [templates-dir (io/file "templates")]
     (.mkdir "components")
     (.mkdir templates-dir)
-    (spit (io/file templates-dir "index.html") template-index)
-    (spit (io/file templates-dir "page.html") template-page)
-    (spit "statite.edn" "{}")
-    (spit "squint.edn" "{:paths [\"components\"]\n :output-dir \"components/modules\"}")
+    (ensure-file! (io/file templates-dir "index.html") template-index)
+    (ensure-file! (io/file templates-dir "page.html") template-page)
+    (ensure-file! "deps.edn" "{}")
+    (ensure-file! "statite.edn" "{}")
+    (ensure-file! "squint.edn" "{:paths [\"components\"]\n :output-dir \"components/modules\"}")
     (p/shell "npm install --save-dev esbuild squint-cljs")))
 
 (defmethod execute :watch [_ _]
