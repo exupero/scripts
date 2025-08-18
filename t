@@ -58,7 +58,7 @@
                "---\n"
                content))))
 
-(defn title [content]
+(defn parse-title [content]
   (-> content
       str/split-lines
       (->> (filter (partial re-find #"^# ")))
@@ -84,32 +84,32 @@
                                 {:created (.format (SimpleDateFormat. "yyyy-MM-dd") created)
                                  :type type
                                  :status (or status "todo")
-                                 :title (title content)})))
+                                 :title (parse-title content)})))
                        (if status
                          (filter (comp #{status} :status))
                          (comp)))))]
     (doseq [{:keys [created type status title]} files]
       (println (format "%s %-7s %s %s" created type status title)))))
 
-(defmethod execute :add [_ {[type] :args :keys [dir]}]
+(defmethod execute :add [_ {[type title] :args :keys [dir]}]
   (let [type (types (keyword type))
         datestamp (fmt-date (ld/now))
         template (slurp (or (get-file (str dir "/_templates/" type ".md"))
                             (get-file (str dir "/_templates/generic.md"))))
         content (selmer.parser/render template
-                                      {:title ""
+                                      {:title (or title "")
                                        :datestamp datestamp
                                        :type type})
         file (edit-tempfile dir content)
         edited-content (slurp file)
-        title (title edited-content)
+        title (parse-title edited-content)
         filename (str dir "/" datestamp "-" type "-" (slug title) ".md")]
     (spit filename edited-content)))
 
 (defmethod execute :rename [_ {[filename] :args :keys [dir]}]
   (let [[{:keys [created type]} content] (markdown/frontmatter+content (slurp filename))
         datestamp (.format (SimpleDateFormat. "yyyy-MM-dd") created)
-        title (title content)
+        title (parse-title content)
         new-filename (str dir "/" datestamp "-" type "-" (slug title) ".md")]
     (.renameTo (io/file filename) (io/file new-filename))))
 
