@@ -1,0 +1,50 @@
+#!/usr/bin/env python
+
+# 2025-08-19
+
+import json, pstats, sys
+
+if __name__ == "__main__":
+    stats = pstats.Stats(sys.argv[1])
+
+    json.dump(
+        [
+            {
+                "filename": filename,
+                "line_num": line_num,
+                "func_name": func_name,
+                "primitive_calls": primitive_calls,
+                "total_calls": total_calls,
+                "self_time": self_time,
+                "cum_time": cum_time,
+                "callers": [
+                    {
+                        'filename': caller_filename,
+                        'line_num': caller_line_num,
+                        'func_name': caller_function_name,
+                        'primitive_calls': caller_primitive_calls,
+                        'total_calls': caller_total_calls,
+                        'self_time': caller_self_time,
+                        'cum_time': caller_cum_time
+                    }
+                    for (
+                        caller_filename,
+                        caller_line_num,
+                        caller_function_name
+                    ), (
+                        caller_primitive_calls,
+                        caller_total_calls,
+                        caller_self_time,
+                        caller_cum_time
+                    ) in callers.items()],
+            }
+            for (filename, line_num, func_name), (
+                primitive_calls,
+                total_calls,
+                self_time,
+                cum_time,
+                callers,
+            ) in stats.stats.items()
+        ],
+        sys.stdout,
+    )
