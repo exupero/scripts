@@ -19,7 +19,7 @@ ed ^{etaoin/etaoin "1.0.40"} etaoin.dev
 edn clojure.edn
 fipp.edn ^{fipp/fipp "0.6.26"} fipp.edn
 fs babashka.fs
-fw ^{org.babashka/fswatcher "0.0.5"} ^:pod pod.babashka.fswatcher
+fw ^{org.babashka/fswatcher "0.0.7"} ^:pod pod.babashka.fswatcher
 h ^{com.github.seancorfield/honeysql "2.5.1091"} honey.sql
 hiccup hiccup2.core
 http-client org.httpkit.client
