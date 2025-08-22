@@ -3,30 +3,10 @@
 (ns scittle
   (:require [clojure.java.io :as io]
             [clojure.tools.cli :as cli]
-            [babashka.pods :as pods]
             [hiccup2.core :as hiccup]
-            [org.httpkit.server :as server]))
-(pods/load-pod 'org.babashka/fswatcher "0.0.7")
-(require '[pod.babashka.fswatcher :as fw])
-
-(def listen-and-eval "
-function listenOnWebsocket() {
-  const listen = () => {
-    const conn = new WebSocket(`ws://${window.location.host}${window.location.pathname}`);
-    conn.onopen = () => console.log(`Socket connected to server`);
-    conn.onclose = () => {
-      console.warn(`Socket to server closed; retrying...`);
-      setTimeout(listen, 3000);
-    };
-    conn.onmessage = (e) => {
-      console.log('Evaling');
-      scittle.core.eval_string(e.data)
-    }
-  }
-  listen();
-}
-listenOnWebsocket();
-  ")
+            [org.httpkit.server :as server]
+            serve
+            watcher))
 
 (defn index [script-path _ {:keys [replicant]}]
   {:status 200
@@ -36,6 +16,7 @@ listenOnWebsocket();
               [:head
                [:meta {:charset "UTF-8"}]
                [:meta {:name "viewport" :content "width=device-width, initial-scale=1"}]
+               [:title "Scittle"]
                [:link {:rel "icon" :href "data:,"}]
                [:link {:rel "apple-touch-icon" :href "data:,"}]
                [:script {:src "https://cdn.jsdelivr.net/npm/scittle@0.7.23/dist/scittle.js" :type "application/javascript"}]
@@ -44,47 +25,9 @@ listenOnWebsocket();
               [:body
                [:div {:id "app"}]
                [:script {:type "application/javascript"}
-                (hiccup/raw listen-and-eval)]
+                (hiccup/raw (serve/listen-and "console.log('Evaling'); scittle.core.eval_string(event.data)"))]
                [:script {:type "application/x-scittle"}
                 (hiccup/raw (slurp script-path))]]]))})
-
-(def channels (atom #{}))
-
-(defn on-open [ch]
-  (swap! channels conj ch))
-
-(defn on-receive [ch msg]
-  (println "Received data on" ch ":" (pr-str msg)))
-
-(defn on-close [ch _]
-  (swap! channels disj ch))
-
-(defn serve [handler port]
-  (server/run-server
-   (fn [{:keys [websocket?] :as req}]
-     (if websocket?
-       (server/as-channel req {:on-open on-open
-                               :on-receive on-receive
-                               :on-close on-close})
-       (handler req)))
-   {:port port}))
-
-(def watcher (atom nil))
-
-(defn watch [script-path]
-  (when-let [w @watcher]
-    (fw/unwatch w))
-  (reset! watcher
-          ; Doesn't seem to work to watch one file, only gets one rename event then never
-          ; sees further events
-          (fw/watch (.getParent (io/file script-path))
-                    (fn [{:keys [path]}]
-                      (when (= path script-path)
-                        (println "Changes detected")
-                        (let [data (slurp path)]
-                          (doseq [ch @channels]
-                            (server/send! ch data)))))
-                    {:delay-ms 500})))
 
 (def cli-opts
   [["-p" "--port PORT" "port to serve on"
@@ -93,11 +36,14 @@ listenOnWebsocket();
    ["-r" "--replicant" "Include Replicant"]])
 
 (let [{{:keys [port] :as opts} :options [path] :arguments} (cli/parse-opts *command-line-args* cli-opts)
-      url (str "http://localhost:" port "/")]
-  (watch (.getAbsolutePath (io/file path)))
-  (serve #(index path % opts) port)
+      url (str "http://localhost:" port "/")
+      channels (atom #{})
+      watch (watcher/file)]
+  (serve/serve-channels #(index path % opts) port channels)
   (println "Serving at" url)
-  (try
-    @(promise)
-    (catch Exception _
-      (fw/unwatch @watcher))))
+  (watch (.getAbsolutePath (io/file path))
+         (fn []
+           (println "Changes detected")
+           (let [data (slurp path)]
+             (doseq [ch @channels]
+               (server/send! ch data))))))

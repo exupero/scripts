@@ -3,73 +3,16 @@
 (ns vega
   (:require [clojure.java.io :as io]
             [clojure.tools.cli :as cli]
-            [babashka.pods :as pods]
             [cheshire.core :as json]
             [hiccup2.core :as hiccup]
-            [org.httpkit.server :as server]))
-(pods/load-pod 'org.babashka/fswatcher "0.0.7")
-(require '[pod.babashka.fswatcher :as fw])
-
-(defonce channels (atom #{}))
-(defonce watcher (atom nil))
-
-(defn watch [edn-path]
-  (when-let [w @watcher]
-    (fw/unwatch w))
-  (reset! watcher
-          ; Doesn't seem to work to watch one file, only gets one rename event
-          ; then never sees further events
-          (fw/watch (.getParent (io/file edn-path))
-                    (fn [{:keys [path]}]
-                      (when (= path edn-path)
-                        (println "Changes detected")
-                        (let [data (-> path slurp read-string (json/generate-string {:pretty true}))]
-                          (doseq [ch @channels]
-                            (server/send! ch data)))))
-                    {:delay-ms 500})))
-
-(defn on-open [ch]
-  (swap! channels conj ch))
-
-(defn on-receive [ch msg]
-  (println "Received data on" ch ":" (pr-str msg)))
-
-(defn on-close [ch _]
-  (swap! channels disj ch))
-
-(defn serve [handler port]
-  (server/run-server
-    (fn [{:keys [websocket?] :as req}]
-      (if websocket?
-        (server/as-channel req {:on-open on-open
-                                :on-receive on-receive
-                                :on-close on-close})
-        (handler req)))
-    {:port port}))
+            [org.httpkit.server :as server]
+            serve
+            watcher))
 
 (defn static-js [filename]
   {:status 200
    :headers {"Content-Type" "application/javascript"}
    :body (slurp (io/file (.getParent (io/file *file*)) "static" filename))})
-
-(def listen-and-render "
-function listenOnWebsocket() {
-  const listen = () => {
-    const conn = new WebSocket(`ws://${window.location.host}${window.location.pathname}`);
-    conn.onopen = () => console.log(`Socket connected to server`);
-    conn.onclose = () => {
-      console.warn(`Socket to server closed; retrying...`);
-      setTimeout(listen, 3000);
-    };
-    conn.onmessage = (e) => {
-      console.log('Evaling');
-      vegaEmbed('#viz', JSON.parse(e.data))
-    }
-  }
-  listen();
-}
-listenOnWebsocket();
-")
 
 (defn index [path {:keys [uri]} _]
   (condp = uri
@@ -93,7 +36,7 @@ listenOnWebsocket();
                       [:body
                        [:div#viz]
                        [:script {:type "application/javascript"}
-                        (hiccup/raw listen-and-render)]
+                        (hiccup/raw (serve/listen-and "console.log('Evaling'); vegaEmbed('#viz', JSON.parse(event.data))"))]
                        [:script {:type "application/javascript"}
                         (hiccup/raw (format "vegaEmbed('#viz', %s);" json))]]]))})
     {:status 404}))
@@ -104,12 +47,14 @@ listenOnWebsocket();
     :parse-fn #(Integer/parseInt %)]])
 
 (let [{{:keys [port] :as opts} :options [path] :arguments} (cli/parse-opts *command-line-args* cli-opts)
-      url (str "http://localhost:" port "/")]
-  (watch (.getAbsolutePath (io/file path)))
-  (serve #(index path % opts) port)
+      url (str "http://localhost:" port "/")
+      channels (atom #{})
+      watch (watcher/file)]
+  (serve/serve-channels #(index path % opts) port channels)
   (println "Serving at" url)
-  (try
-    @(promise)
-    (catch Exception e
-      (prn e)
-      (fw/unwatch @watcher))))
+  (watch (.getAbsolutePath (io/file path))
+         (fn []
+           (println "Changes detected")
+           (let [data (-> path slurp read-string (json/generate-string {:pretty true}))]
+             (doseq [ch @channels]
+               (server/send! ch data))))))
