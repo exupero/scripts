@@ -1,33 +1,103 @@
 #!/usr/bin/env bb
 
 (ns scittle
-  (:require [hiccup2.core :as h]
-            cli
-            serve))
+  (:require [clojure.java.io :as io]
+            [clojure.tools.cli :as cli]
+            [babashka.pods :as pods]
+            [hiccup2.core :as hiccup]
+            [org.httpkit.server :as server]))
+(pods/load-pod 'org.babashka/fswatcher "0.0.7")
+(require '[pod.babashka.fswatcher :as fw])
 
-(defn index [script _]
+(def listen-and-eval "
+function listenOnWebsocket() {
+  const listen = () => {
+    const conn = new WebSocket(`ws://${window.location.host}${window.location.pathname}`);
+    conn.onopen = () => console.log(`Socket connected to server`);
+    conn.onclose = () => {
+      console.warn(`Socket to server closed; retrying...`);
+      setTimeout(listen, 3000);
+    };
+    conn.onmessage = (e) => {
+      console.log('Evaling');
+      scittle.core.eval_string(e.data)
+    }
+  }
+  listen();
+}
+listenOnWebsocket();
+  ")
+
+(defn index [script-path _ {:keys [replicant]}]
   {:status 200
    :body (str
-           (h/html
+           (hiccup/html
              [:html
               [:head
                [:meta {:charset "UTF-8"}]
                [:meta {:name "viewport" :content "width=device-width, initial-scale=1"}]
                [:link {:rel "icon" :href "data:,"}]
                [:link {:rel "apple-touch-icon" :href "data:,"}]
-               [:script {:crossorigin nil :src "https://unpkg.com/react@17/umd/react.production.min.js"}]
-               [:script {:crossorigin nil :src "https://unpkg.com/react-dom@17/umd/react-dom.production.min.js"}]
-               [:script {:src "https://cdn.jsdelivr.net/npm/scittle@0.6.17/dist/scittle.js" :type "application/javascript"}]
-               [:script {:src "https://cdn.jsdelivr.net/npm/scittle@0.6.17/dist/scittle.reagent.js" :type "application/javascript"}]
-               [:script {:src "https://cdn.jsdelivr.net/npm/scittle@0.6.17/dist/scittle.cljs-ajax.js" :type "application/javascript"}]]
+               [:script {:src "https://cdn.jsdelivr.net/npm/scittle@0.7.23/dist/scittle.js" :type "application/javascript"}]
+               (when replicant
+                 [:script {:src "https://cdn.jsdelivr.net/npm/scittle@0.7.23/dist/scittle.replicant.js" :type "application/javascript"}])]
               [:body
                [:div {:id "app"}]
+               [:script {:type "application/javascript"}
+                (hiccup/raw listen-and-eval)]
                [:script {:type "application/x-scittle"}
-                (h/raw (slurp script))]]]))})
+                (hiccup/raw (slurp script-path))]]]))})
 
-(cli/with-opts [[[-p --port 8888 "port to serve on"]]
-                [script]]
-  (let [url (str "http://localhost:" port "/")]
-    (serve/serve (partial index script) port)
-    (println "Serving at" url)
-    @(promise)))
+(def channels (atom #{}))
+
+(defn on-open [ch]
+  (swap! channels conj ch))
+
+(defn on-receive [ch msg]
+  (println "Received data on" ch ":" (pr-str msg)))
+
+(defn on-close [ch _]
+  (swap! channels disj ch))
+
+(defn serve [handler port]
+  (server/run-server
+   (fn [{:keys [websocket?] :as req}]
+     (if websocket?
+       (server/as-channel req {:on-open on-open
+                               :on-receive on-receive
+                               :on-close on-close})
+       (handler req)))
+   {:port port}))
+
+(def watcher (atom nil))
+
+(defn watch [script-path]
+  (when-let [w @watcher]
+    (fw/unwatch w))
+  (reset! watcher
+          ; Doesn't seem to work to watch one file, only gets one rename event then never
+          ; sees further events
+          (fw/watch (.getParent (io/file script-path))
+                    (fn [{:keys [path]}]
+                      (when (= path script-path)
+                        (println "Changes detected")
+                        (let [data (slurp path)]
+                          (doseq [ch @channels]
+                            (server/send! ch data)))))
+                    {:delay-ms 500})))
+
+(def cli-opts
+  [["-p" "--port PORT" "port to serve on"
+    :default 8888
+    :parse-fn #(Integer/parseInt %)]
+   ["-r" "--replicant" "Include Replicant"]])
+
+(let [{{:keys [port] :as opts} :options [path] :arguments} (cli/parse-opts *command-line-args* cli-opts)
+      url (str "http://localhost:" port "/")]
+  (watch (.getAbsolutePath (io/file path)))
+  (serve #(index path % opts) port)
+  (println "Serving at" url)
+  (try
+    @(promise)
+    (catch Exception _
+      (fw/unwatch @watcher))))
