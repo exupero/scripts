@@ -11,6 +11,7 @@
 (defn index [script-path _ {:keys [replicant]}]
   {:status 200
    :body (str
+           "<!DOCTYPE html>\n"
            (hiccup/html
              [:html
               [:head
