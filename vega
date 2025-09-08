@@ -14,47 +14,59 @@
    :headers {"Content-Type" "application/javascript"}
    :body (slurp (io/file (.getParent (io/file *file*)) "static" filename))})
 
-(defn index [path {:keys [uri]} _]
+(defn index [provider {:keys [uri]} _]
   (condp = uri
     "/static/vega.js" (static-js "vega.js")
     "/static/vega-lite.js" (static-js "vega-lite.js")
     "/static/vega-embed.js" (static-js "vega-embed.js")
-    "/" (let [json (json/generate-string (read-string (slurp path)) {:pretty true})]
-          {:status 200
-           :body (str
-                   (hiccup/html
-                     [:html
-                      [:head
-                       [:meta {:charset "UTF-8"}]
-                       [:meta {:name "viewport" :content "width=device-width, initial-scale=1"}]
-                       [:title "Vega"]
-                       [:link {:rel "icon" :href "data:,"}]
-                       [:link {:rel "apple-touch-icon" :href "data:,"}]
-                       [:script {:src "/static/vega.js"}]
-                       [:script {:src "/static/vega-lite.js"}]
-                       [:script {:src "/static/vega-embed.js"}]]
-                      [:body
-                       [:div#viz]
-                       [:script {:type "application/javascript"}
-                        (hiccup/raw (serve/listen-and "console.log('Evaling'); vegaEmbed('#viz', JSON.parse(event.data))"))]
-                       [:script {:type "application/javascript"}
-                        (hiccup/raw (format "vegaEmbed('#viz', %s);" json))]]]))})
+    "/" {:status 200
+         :body (str
+                 (hiccup/html
+                   [:html
+                    [:head
+                     [:meta {:charset "UTF-8"}]
+                     [:meta {:name "viewport" :content "width=device-width, initial-scale=1"}]
+                     [:title "Vega"]
+                     [:link {:rel "icon" :href "data:,"}]
+                     [:link {:rel "apple-touch-icon" :href "data:,"}]
+                     [:script {:src "/static/vega.js"}]
+                     [:script {:src "/static/vega-lite.js"}]
+                     [:script {:src "/static/vega-embed.js"}]]
+                    [:body
+                     [:div#viz]
+                     [:script {:type "application/javascript"}
+                      (hiccup/raw (serve/listen-and "console.log('Evaling'); vegaEmbed('#viz', JSON.parse(event.data))"))]
+                     [:script {:type "application/javascript"}
+                      (hiccup/raw (format "vegaEmbed('#viz', %s);" (provider)))]]]))}
     {:status 404}))
+
+(defn serve-file [path port opts]
+  (let [url (str "http://localhost:" port "/")
+        channels (atom #{})
+        watch (watcher/file)
+        provider #(json/generate-string (read-string (slurp path)) {:pretty true})]
+    (serve/serve-channels #(index provider % opts) port channels)
+    (println "Serving at" url)
+    (watch (.getAbsolutePath (io/file path))
+           (fn []
+             (println "Changes detected")
+             (let [data (-> path slurp read-string (json/generate-string {:pretty true}))]
+               (doseq [ch @channels]
+                 (server/send! ch data)))))))
+
+(defn serve-stdin [port opts]
+  (let [url (str "http://localhost:" port "/")
+        provider (constantly (json/generate-string (read-string (slurp *in*)) {:pretty true}))]
+    (println "Serving at" url)
+    (serve/serve #(index provider % opts) port)
+    @(promise)))
 
 (def cli-opts
   [["-p" "--port PORT" "port to serve on"
     :default 8888
     :parse-fn #(Integer/parseInt %)]])
 
-(let [{{:keys [port] :as opts} :options [path] :arguments} (cli/parse-opts *command-line-args* cli-opts)
-      url (str "http://localhost:" port "/")
-      channels (atom #{})
-      watch (watcher/file)]
-  (serve/serve-channels #(index path % opts) port channels)
-  (println "Serving at" url)
-  (watch (.getAbsolutePath (io/file path))
-         (fn []
-           (println "Changes detected")
-           (let [data (-> path slurp read-string (json/generate-string {:pretty true}))]
-             (doseq [ch @channels]
-               (server/send! ch data))))))
+(let [{{:keys [port] :as opts} :options [path] :arguments} (cli/parse-opts *command-line-args* cli-opts)]
+  (if (= path "-")
+    (serve-stdin port opts)
+    (serve-file path port opts)))
