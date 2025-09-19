@@ -19,7 +19,7 @@
         (System/exit 1)))
     (doseq [repo repos]
       (if-not (.exists repo)
-        (println "repo" repo "does not exist")
+        (println "repo" (.getAbsolutePath repo) "does not exist")
         (when (git/changes? repo)
           (println (.getAbsolutePath repo))
           (p/shell {:dir repo} "git -c color.ui=always status --short")
