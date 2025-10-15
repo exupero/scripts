@@ -1,10 +1,8 @@
 #!/usr/bin/env bb
 
-(ns browse
-  (:require [clojure.java.browse :as browse]
-            [clojure.java.io :as io]
-            [clojure.string :as string]
-            [org.httpkit.server :as server]))
+(ns browse_
+  (:require [clojure.java.io :as io]
+            browse))
 
 (def static-path
   (str (.getParent (io/file *file*)) "/static"))
