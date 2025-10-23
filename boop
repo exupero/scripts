@@ -1,0 +1,9 @@
+#!/bin/bash
+
+set -e
+
+cmd=$(printf ' %q' "$@" | sed 's/^[[:space:]]*//')
+
+dir=$(basename "$(pwd)")
+
+bash -c "$cmd" && notify-success "\`$cmd\` succeeded in $dir" || notify-fail "\`$cmd\` failed in $dir"
