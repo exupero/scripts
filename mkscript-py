@@ -1,0 +1,15 @@
+#!/bin/bash
+
+set -e
+
+name=$1
+path=$HOME/code/dotfiles/bin/$name
+
+cat > $path << EOF
+#!/usr/bin/env python
+# vim: set filetype=python:
+
+if __name__ == "__main__":
+EOF
+
+echo -n $path

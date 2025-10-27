@@ -1,0 +1,21 @@
+#!/usr/bin/env python
+# vim: set filetype=python:
+
+import ast
+import json
+import sys
+
+
+def ast_to_dict(node):
+    if isinstance(node, ast.AST):
+        result = {'_type': node.__class__.__name__}
+        for field, value in ast.iter_fields(node):
+            result[field] = ast_to_dict(value)
+        return result
+    if isinstance(node, list):
+        return [ast_to_dict(item) for item in node]
+    return node
+
+
+if __name__ == "__main__":
+    print(json.dumps(ast_to_dict(ast.parse(sys.stdin.read())), indent=2))
