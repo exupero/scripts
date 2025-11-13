@@ -6,4 +6,11 @@ cmd=$(printf ' %q' "$@" | sed 's/^[[:space:]]*//')
 
 dir=$(basename "$(pwd)")
 
-bash -c "$cmd" && notify-success "\`$cmd\` succeeded in $dir" || notify-fail "\`$cmd\` failed in $dir"
+bash -c "$cmd"
+code=$?
+if [ $code -eq 0 ]; then
+  notify-success "\`$cmd\` succeeded in $dir"
+else
+  notify-fail "\`$cmd\` failed in $dir"
+  exit $code
+fi
