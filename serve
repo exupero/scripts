@@ -239,7 +239,7 @@ listenOnWebsocket();
      {:port port})
     (println "Starting HTTP server at" port "for" (str dir))
     (when open
-      (clojure.java.browse/browse-url (format "http://localhost:%s/" port)))
+      (clojure.java.browse/browse-url (format "http://localhost:%s/%s" port open)))
     (try
       @(promise)
       (finally
