@@ -10,12 +10,12 @@ mkdir -p \
   resources/public \
   portfolio/resources/public \
   portfolio/src \
-  src/dev \
-  src/main/$name \
-  src/test
+  src/$name \
+  dev \
+  test
 
 cat << EOF > deps.edn
-{:paths ["src/dev" "src/main" "src/test" "resources"]
+{:paths ["src" "test" "dev" "resources"]
  :deps {hashp/hashp {:mvn/version "0.2.2"}
         no.cjohansen/nexus {:mvn/version "2025.07.1"}
         no.cjohansen/replicant {:mvn/version "2025.03.27"}
@@ -102,7 +102,7 @@ portfolio/resources/public/js
 !resources/public/js/app.js
 EOF
 
-cat << EOF > src/main/$name/app.cljs
+cat << EOF > src/$name/app.cljs
 (ns $name.app
   (:require [nexus.registry :as nxr]
             [replicant.dom :as r]
@@ -124,13 +124,13 @@ cat << EOF > src/main/$name/app.cljs
                (r/render el ($name.ui/main state)))))
 EOF
 
-cat << EOF > src/main/$name/db.cljs
+cat << EOF > src/$name/db.cljs
 (ns $name.db)
 
 (defonce store (atom {}))
 EOF
 
-cat << EOF > src/main/$name/events.cljs
+cat << EOF > src/$name/events.cljs
 (ns $name.events
   (:require $name.db
             [nexus.registry :as nxr]))
@@ -140,7 +140,7 @@ cat << EOF > src/main/$name/events.cljs
     (some-> dom-event .-target .-value)))
 EOF
 
-cat << EOF > src/main/$name/ui.cljs
+cat << EOF > src/$name/ui.cljs
 (ns $name.ui)
 
 (defn main [state]
