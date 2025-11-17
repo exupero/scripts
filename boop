@@ -1,7 +1,5 @@
 #!/bin/bash
 
-set -e
-
 cmd=$(printf ' %q' "$@" | sed 's/^[[:space:]]*//')
 
 dir=$(basename "$(pwd)")
