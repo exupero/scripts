@@ -1,0 +1,7 @@
+#!/bin/bash
+
+set -e
+
+target=$1
+
+tmux send-keys -t "$target" C-c up C-m
