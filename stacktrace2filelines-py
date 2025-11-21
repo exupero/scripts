@@ -1,0 +1,52 @@
+#!/usr/bin/env bb
+
+(ns stacktrace2filelines-py
+  (:require [clojure.java.io :as io]
+            [clojure.string :as str]
+            [clojure.tools.cli :as cli]
+            [babashka.deps :as deps]
+            git
+            js))
+(deps/add-deps '{:deps {net.cgrand/xforms {:mvn/version "0.19.6"}}})
+(require '[net.cgrand.xforms :as xf])
+
+(defn parse-line [text]
+  (when-let [[_ filename line-number] (re-find #"^\s*File \"(.+)\", line (\d+)," text)]
+    {:filename filename
+     :line-number (parse-long line-number)}))
+
+(defn vim-line [text dir]
+  (when-let [{:keys [filename line-number]} (parse-line text)]
+    (str (str/replace (str/triml filename) (str dir "/") "")
+         \: line-number ": " (str/trimr text))))
+
+(defn json-line [[position text] dir]
+  (when-let [{:keys [filename line-number]} (parse-line text)]
+    (when-not (= filename "<string>")
+      {:path (str/replace filename (str dir "/") "")
+       :line line-number
+       :text (str/trim text)
+       :position position})))
+
+(def cli-opts
+  [["-j" "--json" "output data as json"
+    :id :json?]])
+
+(let [{{:keys [json?]} :options [] :arguments}
+      , (cli/parse-opts *command-line-args* cli-opts)]
+  (let [root (git/root)
+        dir (System/getProperty "user.dir")]
+    (if json?
+      (->> (slurp *in*)
+           str/split-lines
+           (map vector (range))
+           (keep #(json-line % dir))
+           js/pprint)
+      (->> (slurp *in*)
+           str/split-lines
+           (transduce
+             (comp
+               (keep #(vim-line % dir))
+               (interpose "\n"))
+             str)
+           print))))

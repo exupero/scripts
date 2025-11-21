@@ -1,21 +1,14 @@
 #!/usr/bin/env bb
 
-(ns stacktrace2filelines
+(ns stacktrace2filelines-javakt
   (:require [clojure.java.io :as io]
             [clojure.string :as str]
+            [clojure.tools.cli :as cli]
             [babashka.deps :as deps]
-            cli
             git
             js))
 (deps/add-deps '{:deps {net.cgrand/xforms {:mvn/version "0.19.6"}}})
 (require '[net.cgrand.xforms :as xf])
-
-(def subdirs
-  ["appserver"
-   "cache"
-   "common"
-   "compute"
-   "seriesdata"])
 
 (defn files-by-name [dirs]
   (->> dirs
@@ -23,11 +16,16 @@
        (into {}
              (comp
                (remove #(.isDirectory %))
-               (filter #(re-find #"\.(java|kt)" (.getName %)))
+               (filter #(re-find #"\.(java|kt)$" (.getName %)))
                (xf/by-key #(.getName %) (xf/into []))))))
 
+(defn parse-line [text]
+  (when-let [[_ filename line-number] (re-find #"^\s*at .+\((.+):(\d+)\)$" text)]
+    {:filename filename
+     :line-number (parse-long line-number)}))
+
 (defn vim-line [text dir index]
-  (or (when-let [[_ filename line-number] (re-find #"^\s*at .+\((.+):(\d+)\)$" text)]
+  (or (when-let [{:keys [filename line-number]} (parse-line text)]
         (when-let [files (seq (index filename))]
           (map #(str (str/replace (.getAbsolutePath %) (str dir "/") "")
                      \: line-number ": " text)
@@ -35,7 +33,7 @@
       [(str/trim text)]))
 
 (defn json-line [[position text] dir index]
-  (or (when-let [[_ filename line-number] (re-find #"^\s*at .+\((.+):(\d+)\)$" text)]
+  (or (when-let [{:keys [filename line-number]} (parse-line text)]
         (when-let [files (seq (index filename))]
           (map #(do {:path (str/replace (.getAbsolutePath %) (str dir "/") "")
                      :line (parse-long line-number)
@@ -44,12 +42,20 @@
                files)))
       [{:text (str/trim text)}]))
 
-(cli/with-opts [[[-j --json "output data as json"]]
-                []]
+(def cli-opts
+  [["-j" "--json" "output data as json"
+    :id :json?]
+   ["-o" "--only DIR" "only search in this subdirectory; repeatable"
+    :multi true
+    :default []
+    :update-fn conj]])
+
+(let [{{:keys [json? only]} :options [] :arguments}
+      , (cli/parse-opts *command-line-args* cli-opts)]
   (let [root (git/root)
-        index (files-by-name (map (partial str root "/") subdirs))
+        index (files-by-name (map (partial str root "/") only))
         dir (System/getProperty "user.dir")]
-    (if json
+    (if json?
       (->> (slurp *in*)
            str/split-lines
            (map vector (range))
