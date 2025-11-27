@@ -1,0 +1,51 @@
+#!/usr/bin/env bb
+
+(ns template
+  (:require [clojure.java.io :as io]
+            [clojure.string :as str]
+            [clojure.tools.cli :as cli]
+            [selmer.parser :as selmer]))
+
+(defn find-template-dir [roots nm]
+  (first
+    (sequence
+      (comp
+        (map #(io/file % nm))
+        (filter #(.exists %)))
+      roots)))
+
+(def cli-opts
+  [["-f" "--field NAME=VALUE" "A name and value to include when rendering templates; repeatable"
+    :id :fields
+    :multi true
+    :default []
+    :parse-fn (fn [s]
+                (let [[k v] (str/split s #"=" 2)]
+                  [(keyword k) v]))
+    :update-fn conj]
+   ["-v" "--variant VALUE" "The name of a variant of the main template to merge in; repeatable"
+    :id :variants
+    :multi true
+    :default []
+    :update-fn conj]])
+
+(let [{{:keys [fields variants]} :options [template dest nm] :arguments} (cli/parse-opts *command-line-args* cli-opts)
+      _ (when-not (and template dest nm)
+          (println "Usage: template TEMPLATE DEST NAME [--field NAME=VALUE ...] [--variant VARIANT ...]")
+          (System/exit 1))
+      roots (str/split (System/getenv "TEMPLATES_PATH") #":")
+      template-dirs (->> variants
+                         (map #(str template \. %))
+                         (into [template])
+                         (map (partial find-template-dir roots)))
+      context (into {:name nm} fields)]
+  (doseq [template-dir template-dirs]
+    (doseq [file (file-seq template-dir)]
+      (let [dest-path (-> (.getPath file)
+                          (str/replace-first (.getPath template-dir) dest)
+                          (selmer/render context))]
+        (if (.isDirectory file)
+          (.mkdirs (io/file dest-path))
+          (spit dest-path
+            (-> (slurp file)
+                (selmer/render context))))))))

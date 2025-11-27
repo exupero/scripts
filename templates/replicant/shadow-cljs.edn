@@ -1,0 +1,19 @@
+{:deps true
+ :dev-http {8000 ["resources/public"]
+            8001 ["portfolio/resources/public" "classpath:public"]}
+ :builds {:app
+          {:target :browser
+           :output-dir "resources/public/js"
+           :asset-path "/js"
+           :modules {:app {:entries [$name.app]
+                           :init-fn {{name}}.app/init}}
+           :devtools {:watch-dir "resources/public"
+                      :preloads [hashp.core]}}
+
+          :portfolio
+          {:target :browser
+           :modules {:scenes {:init-fn portfolio/main}}
+           :output-dir "portfolio/resources/public/js"
+           :asset-path "/js"
+           :devtools {:watch-dir "resources/public"
+                      :preloads [hashp.core]}}}}
