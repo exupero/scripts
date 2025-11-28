@@ -38,7 +38,10 @@
                          (map #(str template \. %))
                          (into [template])
                          (map (partial find-template-dir roots)))
-      context (into {:name nm} fields)]
+      context (into {:path (str/replace nm "." "/")
+                     :name (str/replace nm "/" ".")
+                     :title (str/capitalize nm)}
+                    fields)]
   (doseq [template-dir template-dirs]
     (doseq [file (file-seq template-dir)]
       (let [dest-path (-> (.getPath file)

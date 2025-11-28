@@ -1,8 +1,4 @@
 {:paths ["bb"]
- :tasks {publish (shell "git subtree push --prefix=resources/public origin gh-pages")
-         release (do
-                   (apply shell "npx shadow-cljs release app" *command-line-args*)
-                   (shell "git add -f resources/public/js/app.js"))
-         server (apply shell "npx shadow-cljs server" *command-line-args*)
+ :tasks {server (apply shell "npx shadow-cljs server" *command-line-args*)
          test (apply shell "npx shadow-cljs compile test --config-merge '{:autorun true}'" *command-line-args*)
          watch (apply shell "npx shadow-cljs watch app portfolio -A dev" *command-line-args*)}}
