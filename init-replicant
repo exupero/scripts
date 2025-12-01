@@ -132,12 +132,20 @@ EOF
 
 cat << EOF > src/$name/events.cljs
 (ns $name.events
-  (:require $name.db
-            [nexus.registry :as nxr]))
+  (:require [nexus.registry :as nxr]
+            $name.db))
 
 (nxr/register-placeholder! :event.target/value
   (fn [{:replicant/keys [dom-event]}]
     (some-> dom-event .-target .-value)))
+
+(nxr/register-placeholder! :event/node
+  (fn [{:replicant/keys [node]}]
+    node))
+
+(nxr/register-effect! :effect/save
+  (fn [_ store path value]
+    (swap! store assoc-in path value)))
 EOF
 
 cat << EOF > src/$name/ui.cljs

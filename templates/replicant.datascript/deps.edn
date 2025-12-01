@@ -1,6 +1,5 @@
 {:paths ["src" "test" "dev" "resources"]
  :deps {datascript/datascript {:mvn/version "1.7.8"}
-        hashp/hashp {:mvn/version "0.2.2"}
         no.cjohansen/nexus {:mvn/version "2025.07.1"}
         no.cjohansen/replicant {:mvn/version "2025.03.27"}
         org.clojure/clojure {:mvn/version "1.12.0"}
