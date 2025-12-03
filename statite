@@ -388,16 +388,16 @@
 (defmulti execute (fn [cmd _] (keyword cmd)))
 
 (defmethod execute :default [_ _]
-  (help
-    "Unknown command. Available commands:"
-    "  watch - start watching for changes and build files"
-    "  help  - show this message"))
+  (help "Unknown command. Available commands:"
+        "  init  - create a new statite project"
+        "  watch - start watching for changes and build files"
+        "  help  - show this message"))
 
 (defmethod execute :help [_ _]
-  (help
-    "Available commands:"
-    "  watch - start watching for changes and build files"
-    "  help  - show this message"))
+  (help "Available commands:"
+        "  init  - create a new statite project"
+        "  watch - start watching for changes and build files"
+        "  help  - show this message"))
 
 (defmethod execute :init [_ _]
   (let [templates-dir (io/file "templates")]

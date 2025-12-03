@@ -1,0 +1,20 @@
+#!/usr/bin/env bb
+
+; Sorts files in a .diff by the length of their changes
+
+(ns diff-sort
+  (:require [clojure.string :as str]
+            [babashka.deps :as deps]
+            xforms))
+(deps/add-deps '{:deps {net.cgrand/xforms {:mvn/version "0.19.6"}}})
+(require '[net.cgrand.xforms :as xf])
+
+(-> (slurp *in*)
+    str/split-lines
+    (->> (sequence
+           (comp
+             (xforms/split-by (partial re-find #"^diff"))
+             (xf/sort-by count)
+             (map (partial str/join "\n")))))
+    (->> (str/join "\n"))
+    println)
