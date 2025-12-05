@@ -8,6 +8,6 @@
 
 (->> (slurp *in*)
      diff/files
-     (sort-by count)
+     (sort-by (comp count str/split-lines))
      (str/join "\n")
      println)

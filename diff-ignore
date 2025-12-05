@@ -5,17 +5,23 @@
             diff
             xforms))
 
-(defn ignorable? [regex lines]
+(defn substitute [s replacements]
+  (reduce (fn [s [pattern replacement]]
+            (str/replace s pattern replacement))
+          s replacements))
+
+(defn ignorable? [replacements lines]
   (let [original (diff/original lines)
         revised (diff/revised lines)]
     (and (= (count original) (count revised))
          (every? (fn [[original revised]]
-                   (or (= original (str/replace revised regex ""))
-                       (= revised (str/replace original regex ""))))
+                   (= original (substitute revised replacements)))
                  (map vector original revised)))))
 
-(let [[pattern] *command-line-args*
-      regex (re-pattern pattern)]
+(let [replacements (->> *command-line-args*
+                        (partition 2)
+                        (map (fn [[pattern replacement]]
+                               [(re-pattern pattern) replacement])))]
   (->> (slurp *in*)
        diff/files
        (transduce
@@ -23,7 +29,7 @@
            (map diff/parse-file)
            (map (fn [{:keys [chunks] :as file}]
                   (update file :chunks (partial remove (fn [{:keys [lines]}]
-                                                         (ignorable? regex lines))))))
+                                                         (ignorable? replacements lines))))))
            (remove (comp empty? :chunks))
            (map diff/unparse-file)
            (interpose "\n"))
