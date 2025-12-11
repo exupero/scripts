@@ -6,8 +6,29 @@
   (:require [clojure.string :as str]
             diff))
 
-(->> (slurp *in*)
-     diff/files
-     (sort-by (comp count str/split-lines))
-     (str/join "\n")
-     println)
+(def sorters
+  {:size (comp count str/split-lines)
+   :deletions (fn [lines]
+                (->> lines
+                     str/split-lines
+                     (filter #(str/starts-with? % "-"))
+                     count
+                     -))
+   :similarity (fn [lines]
+                 (let [additions (->> lines
+                                      str/split-lines
+                                      (filter #(str/starts-with? % "+"))
+                                      count)
+                       deletions (->> lines
+                                      str/split-lines
+                                      (filter #(str/starts-with? % "-"))
+                                      count)]
+                   (Math/abs (- additions deletions))))})
+
+(let [[metric] *command-line-args*
+      metric (or (some-> metric keyword) :size)]
+  (->> (slurp *in*)
+       diff/files
+       (sort-by (sorters metric))
+       (str/join "\n")
+       println))
