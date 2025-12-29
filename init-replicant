@@ -18,7 +18,7 @@ cat << EOF > deps.edn
 {:paths ["src" "test" "dev" "resources"]
  :deps {hashp/hashp {:mvn/version "0.2.2"}
         no.cjohansen/nexus {:mvn/version "2025.07.1"}
-        no.cjohansen/replicant {:mvn/version "2025.03.27"}
+        no.cjohansen/replicant {:git/url "https://github.com/cjohansen/replicant.git" :git/sha "915eadcd590eee2886a644540a7217db737cbd6b"}
         org.clojure/clojure {:mvn/version "1.12.0"}
         thheller/shadow-cljs {:mvn/version "2.11.23"}}
  :aliases {:dev {:extra-paths ["portfolio/src"]
@@ -191,9 +191,9 @@ cat << EOF > .github/workflows/deploy.yml
 name: Deploy to GitHub Pages
 
 on:
-  push:
-    branches:
-    - main
+  # push:
+  #   branches:
+  #   - main
   workflow_dispatch:
 
 jobs:
