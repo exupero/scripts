@@ -47,6 +47,13 @@
                       (hiccup/raw (format "vegaEmbed('#viz', %s);" (provider)))]]]))}
     {:status 404}))
 
+(defn eval-safe [form]
+  (try
+    (eval form)
+    (catch Exception e
+      (prn "Error during eval:" (.getMessage e))
+      nil)))
+
 (defn serve-file [path port {:keys [json] :as opts}]
   (let [url (str "http://localhost:" port "/")
         channels (atom #{})
@@ -54,7 +61,7 @@
         provider #(-> (slurp path)
                       (->> (format "(do %s)"))
                       read-string
-                      eval
+                      eval-safe
                       (json/generate-string {:pretty true}))
         callback (fn []
                    (println "Changes detected")
