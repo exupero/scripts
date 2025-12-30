@@ -1,0 +1,46 @@
+#!/usr/bin/env bb
+
+(ns progress
+  (:require [clojure.tools.cli :as cli]
+            [babashka.process :as p]))
+
+(defn parse-seconds [s]
+  (if-let [[_ m s] (re-find #"(\d+)m(\d+)s" s)]
+    (+ (* 60 (parse-long m)) (parse-long s))
+    (if-let [[_ m] (re-find #"(\d+)m" s)]
+      (* 60 (parse-long m))
+      (parse-long s))))
+
+(defn fmt-seconds [s]
+  (let [mins (int (/ s 60))
+        secs (mod s 60)]
+    (str mins "m " secs "s")))
+
+(defn progress-bar [value total width]
+  (let [filled (int (* width (/ value total)))
+        empty (- width filled)]
+    (str (apply str (repeat filled "█"))
+         (apply str (repeat empty " ")))))
+
+(def cli-opts
+  [["-e" "--estimate ESTIMATE" "Estimated run time in seconds"
+    :parse-fn parse-seconds]
+   ["-i" "--interval INTERVAL" "Interval between progress updates in seconds"
+    :default 1
+    :parse-fn parse-long]])
+
+(let [{{:keys [estimate interval]} :options script :arguments} (cli/parse-opts *command-line-args* cli-opts)
+      {:keys [proc]} (apply p/process script)
+      ms-interval (* interval 1000)]
+  (loop [seconds 0]
+    (when (.isAlive proc)
+      (let [message (if estimate
+                      (str "Progress |" (progress-bar seconds estimate 20) "| "
+                           (fmt-seconds seconds) " / ~" (fmt-seconds estimate) " (" (int (* 100 (/ seconds estimate))) "%) "
+                           "ETA " (fmt-seconds (max 0 (- estimate seconds))))
+                      (str "Progress " (fmt-seconds seconds)))]
+        (binding [*out* *err*]
+          (print message "\r")
+          (flush)))
+      (Thread/sleep ms-interval)
+      (recur (+ seconds interval)))))
