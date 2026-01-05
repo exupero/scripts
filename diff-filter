@@ -1,0 +1,18 @@
+#!/usr/bin/env bb
+
+(ns diff-filter
+  (:require [clojure.string :as str]
+            diff))
+
+(defn evaluate [form content]
+  (eval `(let [~'content ~content]
+           ~form)))
+
+(let [[code] *command-line-args*
+      code (read-string code)]
+  (->> (slurp *in*)
+       diff/files
+       (filter (fn [content]
+                 (evaluate code content)))
+       (str/join "\n")
+       println))
