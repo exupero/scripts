@@ -2,17 +2,23 @@
 
 (ns diff-filter
   (:require [clojure.string :as str]
+            [clojure.tools.cli :as cli]
             diff))
 
 (defn evaluate [form content]
   (eval `(let [~'content ~content]
            ~form)))
 
-(let [[code] *command-line-args*
-      code (read-string code)]
+(def cli-opts
+  [["-n" "--negate" "Negate the filter condition"
+    :id :negate?]])
+
+(let [{{:keys [negate?]} :options [code] :arguments} (cli/parse-opts *command-line-args* cli-opts)
+      code (read-string code)
+      process (if negate? not identity)]
   (->> (slurp *in*)
        diff/files
        (filter (fn [content]
-                 (evaluate code content)))
+                 (process (evaluate code content))))
        (str/join "\n")
        println))

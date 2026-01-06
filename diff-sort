@@ -7,7 +7,13 @@
             diff))
 
 (def sorters
-  {:size (comp count str/split-lines)
+  {:additions (fn [lines]
+                (->> lines
+                     str/split-lines
+                     (filter #(str/starts-with? % "+"))
+                     count
+                     -))
+   :alphabetical identity
    :deletions (fn [lines]
                 (->> lines
                      str/split-lines
@@ -23,7 +29,11 @@
                                       str/split-lines
                                       (filter #(str/starts-with? % "-"))
                                       count)]
-                   (Math/abs (- additions deletions))))})
+                   (Math/abs (- additions deletions))))
+   :size (comp count str/split-lines)
+   :test (fn [lines]
+           (let [[line] (str/split-lines lines)]
+             (if (re-find #"\btests?\b" line) 1 0)))})
 
 (let [[metric] *command-line-args*
       metric (or (some-> metric keyword) :size)]
