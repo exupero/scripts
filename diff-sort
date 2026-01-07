@@ -1,10 +1,12 @@
 #!/usr/bin/env bb
 
-; Sorts files in a .diff by the length of their changes
+; Sorts files in a .diff by a variety of metrics: number of additions,
+; deletions, alphabetically, similarity, size, and whether it's a test.
 
 (ns diff-sort
   (:require [clojure.string :as str]
-            diff))
+            diff
+            util))
 
 (def sorters
   {:additions (fn [lines]
@@ -35,10 +37,14 @@
            (let [[line] (str/split-lines lines)]
              (if (re-find #"\btests?\b" line) 1 0)))})
 
-(let [[metric] *command-line-args*
-      metric (or (some-> metric keyword) :size)]
+(let [[metric] *command-line-args*]
+  (when-not metric
+    (let [metrics (->> (keys sorters)
+                       (map name)
+                       (str/join ", "))]
+      (util/abort (str "Must specify a sorting metric: " metrics))))
   (->> (slurp *in*)
        diff/files
-       (sort-by (sorters metric))
+       (sort-by (sorters (keyword metric)))
        (str/join "\n")
        println))
