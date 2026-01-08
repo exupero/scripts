@@ -1,0 +1,19 @@
+#!/usr/bin/env bb
+
+(ns env-diff
+  (:require [clojure.string :as str]
+            [babashka.deps :as deps]))
+(deps/add-deps '{:deps {lambdaisland/deep-diff2 {:mvn/version "2.11.216"}}})
+(require '[lambdaisland.deep-diff2 :as deep-diff])
+
+(defn parse-env [content]
+  (->> content
+       str/split-lines
+       (remove (partial re-find #"^$|^#"))
+       (map #(vec (str/split % #"=" 2)))
+       (into {})))
+
+(let [[path1 path2] *command-line-args*
+      env1 (parse-env (slurp path1))
+      env2 (parse-env (slurp path2))]
+  (deep-diff/pretty-print (deep-diff/diff env1 env2)))

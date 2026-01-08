@@ -1,0 +1,14 @@
+#!/usr/bin/env bb
+
+(ns diff-rotate
+  (:require [clojure.string :as str]
+            diff))
+
+(defn rotate [coll]
+  (concat (rest coll) (take 1 coll)))
+
+(->> (slurp *in*)
+     diff/files
+     rotate
+     (str/join "\n")
+     println)
