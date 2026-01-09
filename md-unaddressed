@@ -1,0 +1,21 @@
+#!/usr/bin/env bb
+
+(ns md-unaddressed
+  (:require [clojure.string :as str]
+            xforms))
+
+(->> (slurp *in*)
+     str/split-lines
+     (sequence
+       (comp
+         (xforms/split-by (partial re-find #"^---$"))
+         (map (fn [lines]
+                (->> lines
+                     (drop-while #{"" "---"})
+                     reverse
+                     (drop-while #{""})
+                     reverse)))
+         (remove (partial some (partial re-find #"\[(answer|fixed)\]")))
+         (map (partial str/join "\n"))))
+     (str/join "\n\n---\n\n")
+     println)
