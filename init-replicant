@@ -1,5 +1,8 @@
 #!/bin/bash
 
+echo Deprecated: instead use 'template replicant ...'
+exit 1
+
 name=${PWD##*/}
 
 npm init -y
