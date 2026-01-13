@@ -1,0 +1,80 @@
+#!/usr/bin/env bb
+
+(ns diff-comments
+  (:require [clojure.string :as str]
+            [babashka.deps :as deps]
+            diff))
+(deps/add-deps '{:deps {meander/epsilon {:mvn/version "0.0.650"}}})
+(require '[meander.epsilon :as m]
+         '[meander.strategy.epsilon :as m*])
+
+(defn parse-filename [file-header]
+  (second (re-find #"^diff --git a/.+ b/(.+)" file-header)))
+
+(defn parse-range [chunk-header]
+  (let [[_ old-start old-count new-start new-count]
+        , (re-find #"^@@ -(\d+),(\d+)? \+(\d+),(\d+) @@" chunk-header)]
+    {:original {:start (parse-long old-start)
+                :count (parse-long old-count)}
+     :revised {:start (parse-long new-start)
+               :count (parse-long new-count)}}))
+
+(defn comments [files]
+  (m/search files
+    (m/scan {:header ((m/app parse-filename ?path) & _)
+             :chunks (m/scan {:header (m/app parse-range ?range)
+                              :lines (!prefix ...
+                                        "v"
+                                        . (m/pred #(not= "^" %) !code) ...
+                                        "^"
+                                        . (m/pred #(not= "v" %) !comment) ...
+                                        "x"
+                                        . _ ...)})})
+    , {:path ?path
+       :range ?range
+       :prefix !prefix
+       :code !code
+       :comment !comment}))
+
+(def without-comments
+  (m*/repeat
+    (m*/rewrite
+      (!prefix ...
+               "v"
+               . (m/pred #(not= "^" %) !code) ...
+               "^"
+               . (m/pred #(not= "v" %) !comment) ...
+               "x"
+               . !tail ...)
+      , (!prefix ... . !code ... . !tail ...)
+      [!prefix ...
+       "v"
+       . (m/pred #(not= "^" %) !code) ...
+       "^"
+       . (m/pred #(not= "v" %) !comment) ...
+       "x"
+       . !tail ...]
+      , [!prefix ... . !code ... . !tail ...])))
+
+(defn build [{{:keys [original revised]} :range cmt :comment :keys [path prefix code]}]
+  (let [prefix (without-comments prefix)]
+    {:path path
+     :original-line (+ (original :start)
+                       (count (filter (partial re-find #"^[ -]|^$") prefix)))
+     :revised-line (+ (revised :start)
+                      (count (filter (partial re-find #"^[ +]|^$") prefix)))
+     :code (str/join "\n" code)
+     :comment (str/join "\n" cmt)
+     :prefix prefix}))
+
+(defn fmt [{cmt :comment :keys [path original-line revised-line code]}]
+  (str "```diff " path " -" original-line " +" revised-line "\n"
+       code "\n```\n\n" cmt))
+
+(when (= *file* (System/getProperty "babashka.file"))
+  (->> (slurp *in*)
+       diff/parse
+       comments
+       (map (comp fmt build))
+       (str/join "\n\n---\n\n")
+       println))
