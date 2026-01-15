@@ -1,0 +1,16 @@
+#!/bin/bash
+
+set -e
+
+name=$1
+path=$HOME/code/scripts/$name
+
+cat > $path << EOF
+#!/bin/bash
+
+set -e
+
+
+EOF
+
+echo -n $path

@@ -15,7 +15,7 @@
                      reverse
                      (drop-while #{""})
                      reverse)))
-         (remove (partial some (partial re-find #"\[(answer|fixed)\]")))
+         (remove (partial some (partial re-find #"\[(answered|declined|fixed)\]")))
          (map (partial str/join "\n"))))
      (str/join "\n\n---\n\n")
      println)

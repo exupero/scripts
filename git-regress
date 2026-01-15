@@ -1,0 +1,13 @@
+#!/bin/bash
+
+set -e
+
+mainBranch=$(git remote show origin | grep 'HEAD branch' | cut -d' ' -f5)
+directories=$(git diff $mainBranch... --name-only | cut -d/ -f1 | sort -u | fzf)
+
+if [ -z "$directories" ]; then
+  echo "No directories selected."
+  exit 1
+fi
+
+git diff $mainBranch... -R -- $directories | patch -p1
