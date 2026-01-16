@@ -1,0 +1,11 @@
+#!/usr/bin/env bb
+
+(ns generify-diff
+  (:require [clojure.string :as str]))
+
+(let [content (slurp *in*)]
+  (print
+    (-> content
+        (str/replace #"(?m)^index [0-9a-f]{10}\.\.[0-9a-f]{10}" "index [omitted]..[omitted]")
+        (str/replace #"(?m)^@@ -\d+,\d+ \+\d+,\d+ @@" "@@ -[omitted],[omitted] +[omitted],[omitted] @@")
+        (str/replace #"(?m)^@@ -\d+,\d+ \+\d+ @@" "@@ -[omitted],[omitted] +[omitted] @@"))))
