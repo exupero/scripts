@@ -1,0 +1,3 @@
+#!/bin/bash
+
+nvim +'source Session.vim'
