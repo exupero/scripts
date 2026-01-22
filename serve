@@ -219,24 +219,24 @@ listenOnWebsocket();
   (assert (fs/directory? dir) (str "The given path `" dir "` is not a directory."))
   (let [watcher (watch dir)]
     (server/run-server
-     (fn [{:keys [uri websocket?] :as req}]
-       (if websocket?
-         (let [path (str/replace uri #"/(index\.html)?$" "")]
-           (server/as-channel req {:on-open #(on-open % path)
-                                   :on-receive on-receive
-                                   :on-close on-close}))
-         (let [f (find-file
-                   (fs/path dir (str/replace-first (URLDecoder/decode uri) #"^/" "")))]
-           (cond
-             (nil? f)
-             , (not-found f dir)
-             (-> f fs/file-name ext-mime-type (= "text/html"))
-             , (if live-reload
-                 (body f inject-live-reload-js)
-                 (body f))
-             :else
-             , (body f)))))
-     {:port port})
+      (fn [{:keys [uri websocket?] :as req}]
+        (if websocket?
+          (let [path (str/replace uri #"/(index\.html)?$" "")]
+            (server/as-channel req {:on-open #(on-open % path)
+                                    :on-receive on-receive
+                                    :on-close on-close}))
+          (let [f (find-file
+                    (fs/path dir (str/replace-first (URLDecoder/decode uri) #"^/" "")))]
+            (cond
+              (nil? f)
+              , (not-found f dir)
+              (-> f fs/file-name ext-mime-type (= "text/html"))
+              , (if live-reload
+                  (body f inject-live-reload-js)
+                  (body f))
+              :else
+              , (body f)))))
+      {:port port})
     (println "Starting HTTP server at" port "for" (str dir))
     (when open
       (clojure.java.browse/browse-url (format "http://localhost:%s/%s" port open)))

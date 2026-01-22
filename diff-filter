@@ -10,11 +10,16 @@
            ~form)))
 
 (def cli-opts
-  [["-n" "--negate" "Negate the filter condition"
+  [["-m" "--match MATCH" "Filter by regular expression"]
+   ["-n" "--negate" "Negate the filter condition"
     :id :negate?]])
 
-(let [{{:keys [negate?]} :options [code] :arguments} (cli/parse-opts *command-line-args* cli-opts)
-      code (read-string code)
+(let [{{:keys [negate? match]} :options [code] :arguments} (cli/parse-opts *command-line-args* cli-opts)
+      code (cond
+             match
+             , `(re-find (re-pattern ~match) ~'content)
+             code
+             , (read-string code))
       process (if negate? not identity)]
   (->> (slurp *in*)
        diff/files
