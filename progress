@@ -4,7 +4,7 @@
   (:require [clojure.tools.cli :as cli]
             [babashka.process :as p]))
 
-(defn parse-seconds [s]
+(defn parse-duration [s]
   (if-let [[_ m s] (re-find #"(\d+)m(\d+)s" s)]
     (+ (* 60 (parse-long m)) (parse-long s))
     (if-let [[_ m] (re-find #"(\d+)m" s)]
@@ -23,8 +23,8 @@
          (apply str (repeat empty " ")))))
 
 (def cli-opts
-  [["-e" "--estimate ESTIMATE" "Estimated run time in seconds"
-    :parse-fn parse-seconds]
+  [["-e" "--estimate ESTIMATE" "Estimated run time as seconds or in the form XmYs"
+    :parse-fn parse-duration]
    ["-i" "--interval INTERVAL" "Interval between progress updates in seconds"
     :default 1
     :parse-fn parse-long]])
