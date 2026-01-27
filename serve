@@ -1,6 +1,6 @@
 #!/usr/bin/env bb
 
-(ns server
+(ns serve
   (:require clojure.java.browse
             [clojure.string :as str]
             [babashka.cli :as cli]

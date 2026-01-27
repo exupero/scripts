@@ -1,0 +1,11 @@
+#!/bin/bash
+
+# based on https://jvns.ca/til/fzf-preview-git-commits/
+base=${1:-HEAD^}
+git diff $base... --stat=120 --format="" | \
+  grep -E '^\s*\S+.*\|' | \
+  fzf --ansi \
+      --disabled \
+      --bind 'j:down,k:up,q:abort' \
+      --preview="echo {} | sed 's/|.*//' | xargs -I% git diff $base... --color=always $commit -- %" \
+      --preview-window=right:60%
