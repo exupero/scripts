@@ -3,16 +3,36 @@
 (ns vega
   (:require [clojure.java.io :as io]
             [clojure.tools.cli :as cli]
+            [babashka.pods :as pods]
             [cheshire.core :as json]
             [hiccup2.core :as hiccup]
-            [org.httpkit.server :as server]
-            serve
-            watcher))
+            [org.httpkit.server :as server]))
+(pods/load-pod 'org.babashka/fswatcher "0.0.7")
+(require '[pod.babashka.fswatcher :as fw])
 
 (defn static-js [filename]
   {:status 200
    :headers {"Content-Type" "application/javascript"}
    :body (slurp (io/file (.getParent (io/file *file*)) "static" filename))})
+
+(defn listen-and [js]
+  (str "
+function listenOnWebsocket() {
+  const listen = () => {
+    const conn = new WebSocket(`ws://${window.location.host}${window.location.pathname}`);
+    conn.onopen = () => console.log(`Socket connected to server`);
+    conn.onclose = () => {
+      console.warn(`Socket to server closed; retrying...`);
+      setTimeout(listen, 3000);
+    };
+    conn.onmessage = (event) => {
+      " js "
+    }
+  }
+  listen();
+}
+listenOnWebsocket();
+"))
 
 (defn index [provider {:keys [uri]} {:keys [json thread-first thread-last]}]
   (condp = uri
@@ -42,7 +62,7 @@
                     [:body
                      [:div#viz]
                      [:script {:type "application/javascript"}
-                      (hiccup/raw (serve/listen-and "console.log('Evaling'); vegaEmbed('#viz', JSON.parse(event.data))"))]
+                      (hiccup/raw (listen-and "console.log('Evaling'); vegaEmbed('#viz', JSON.parse(event.data))"))]
                      [:script {:type "application/javascript"}
                       (hiccup/raw (format "vegaEmbed('#viz', %s);" (provider)))]]]))}
     {:status 404}))
@@ -51,13 +71,39 @@
   (try
     (eval form)
     (catch Exception e
-      (prn "Error during eval:" (.getMessage e))
-      nil)))
+      (prn "Error during eval:" (.getMessage e)))))
+
+(defn file-watcher []
+  (let [watcher (atom nil)]
+    (fn [file-path f]
+      (when-let [w @watcher]
+        (fw/unwatch w))
+      (reset! watcher
+              ; fw/watch doesn't seem to work to watch one file, only gets one
+              ; rename event then never sees further events, so instead watch
+              ; the parent directory.
+              (fw/watch (.getParent (io/file file-path))
+                        (fn [{:keys [path]}]
+                          (when (= path file-path)
+                            (f)))
+                        {:delay-ms 500}))
+      (try
+        @(promise)
+        (catch Exception _
+          (fw/unwatch @watcher))))))
+
+(defn channels-handler [handler channels]
+  (fn [{:keys [websocket?] :as req}]
+    (if websocket?
+      (server/as-channel req {:on-open #(swap! channels conj %)
+                              :on-receive #(println "Received data on" %1 ":" (pr-str %2))
+                              :on-close (fn [ch _] (swap! channels disj ch))})
+      (handler req))))
 
 (defn serve-file [path port {:keys [json] :as opts}]
   (let [url (str "http://localhost:" port "/")
         channels (atom #{})
-        watch (watcher/file)
+        watch (file-watcher)
         provider #(-> (slurp path)
                       (->> (format "(do %s)"))
                       read-string
@@ -68,7 +114,7 @@
                    (let [data (provider)]
                      (doseq [ch @channels]
                        (server/send! ch data))))]
-    (serve/serve-channels #(index provider % opts) port channels)
+    (server/run-server (channels-handler #(index provider % opts) channels) {:port port})
     (println "Serving at" url)
     (watch (.getAbsolutePath (io/file path)) callback)
     (when json (watch (.getAbsolutePath (io/file json)) callback))))
@@ -77,7 +123,7 @@
   (let [url (str "http://localhost:" port "/")
         provider (constantly (json/generate-string (read-string (slurp *in*)) {:pretty true}))]
     (println "Serving at" url)
-    (serve/serve #(index provider % opts) port)
+    (server/run-server #(index provider % opts) {:port port})
     @(promise)))
 
 (def cli-opts
