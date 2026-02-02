@@ -11,5 +11,6 @@
       (when (re-find pattern line)
         (swap! collected conj line))
       (println line))
+    (println "\n=== COLLECTED ===")
     (doseq [line @collected]
       (println line))))
