@@ -1,0 +1,23 @@
+#!/usr/bin/env bb
+
+(ns conflict-diff
+  (:require [clojure.string :as str]
+            [babashka.deps :as deps]
+            [babashka.process :as p]))
+
+(let [lines (str/split-lines (slurp *in*))
+      left (->> lines
+                (drop-while #(not (str/starts-with? % "<<<<<<<")))
+                (drop 1)
+                (take-while #(not (str/starts-with? % "|||||||")))
+                (str/join "\n"))
+      right (->> lines
+                 (drop-while #(not (str/starts-with? % "=======")))
+                 (drop 1)
+                 (take-while #(not (str/starts-with? % ">>>>>>>")))
+                 (str/join "\n"))
+      temp-left (doto (File/createTempFile "conflict-diff-left" ".txt")
+                  (spit left))
+      temp-right (doto (File/createTempFile "conflict-diff-right" ".txt")
+                   (spit right))]
+  @(p/shell "nvim -d" temp-left temp-right))

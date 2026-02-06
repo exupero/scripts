@@ -1,0 +1,16 @@
+#!/usr/bin/env obb
+
+(let [[browser url] *command-line-args*
+      app (doto (js/Application.currentApplication)
+            (as-> $ (set! (.-includeStandardAdditions $) true)))
+      se (js/Application "System Events")
+      firefox (js/Application browser)]
+  (.setTheClipboardTo app url)
+  (.activate firefox)
+  (.keystroke se "n" #js {:using #js ["command down"]})
+  (js/delay 0.7)
+  (.keystroke se "l" #js {:using #js ["command down"]})
+  (js/delay 0.5)
+  (.keystroke se "v" #js {:using #js ["command down"]})
+  (js/delay 0.5)
+  (.keystroke se "\r"))
