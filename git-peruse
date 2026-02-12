@@ -1,0 +1,10 @@
+#!/bin/bash
+
+set -e
+
+git log --oneline | grep $* | \
+  fzf --ansi \
+      --disabled \
+      --bind 'j:down,k:up,q:abort' \
+      --preview="echo {} | cut -d' ' -f1 | xargs git show" \
+      --preview-window=right:60%
