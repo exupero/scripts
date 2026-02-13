@@ -1,0 +1,78 @@
+#!/usr/bin/env bb
+
+(ns viz
+  (:require clojure.java.browse
+            [clojure.java.io :as io]
+            [clojure.tools.cli :as cli]
+            [hiccup2.core :as hiccup]
+            [org.httpkit.server :as server]
+            markdown
+            serve
+            watcher))
+
+(def bootstrap-script
+  "
+function listenOnWebsocket() {
+  const listen = () => {
+    const conn = new WebSocket(`ws://${window.location.host}${window.location.pathname}`);
+    conn.onopen = () => console.log(`Socket connected to server`);
+    conn.onclose = () => {
+      console.warn(`Socket to server closed; retrying...`);
+      setTimeout(listen, 3000);
+    };
+    conn.onmessage = (event) => {
+    }
+  }
+  listen();
+}
+listenOnWebsocket();
+")
+
+(defn find-port []
+  (with-open [sock (ServerSocket. 0)]
+    (.getLocalPort sock)))
+
+(defn app [{:keys [uri]}]
+  {:status 200
+   :body (str
+           "<!DOCTYPE html>\n"
+           (hiccup/html
+             [:html
+              [:head
+               [:meta {:charset "UTF-8"}]
+               [:meta {:name "viewport" :content "width=device-width, initial-scale=1"}]
+               [:title "Viz"]
+               [:link {:rel "icon" :href "data:,"}]
+               [:link {:rel "apple-touch-icon" :href "data:,"}]]
+              [:body
+               [:div {:id "app"}]
+               [:script {:type "application/javascript"}
+                (hiccup/raw bootstrap-script)]]]))})
+
+(defn broadcast! [channels data]
+  (doseq [ch channels]
+    (server/send! ch data)))
+
+(def cli-opts
+  [["-t" "--type TYPE" "Type of visualization; valid values are ..."]])
+
+(when (= *file* (System/getProperty "babashka.file"))
+  (let [{{typ :type} :options [path] :arguments} (cli/parse-opts *command-line-args* cli-opts)
+        {{typ' :type} :viz} (markdown/frontmatter (slurp path))
+        typ (or typ typ' (throw (ex-info "Type of visualization must be specified via -t/--type or frontmatter 'viz.type' key" {})))
+        port (find-port)
+        url (str "http://localhost:" port "/")
+        channels (atom #{})
+        watch (watcher/file)
+        file (io/file path)
+        data-provider (fn []
+                        (slurp file))
+        handler #(app % typ data-provider)]
+    (serve/serve-channels handler port channels
+                          {:on-open #(server/send! % (data-provider))})
+    (println "Serving at" url)
+    (watch (.getAbsolutePath file)
+           (fn []
+             (println "Changes detected")
+             (broadcast! @channels (data-provider))))
+    (clojure.java.browse/browse-url url)))

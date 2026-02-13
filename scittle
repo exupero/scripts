@@ -30,6 +30,10 @@
                [:script {:type "application/x-scittle"}
                 (hiccup/raw (slurp script-path))]]]))})
 
+(defn broadcast! [channels data]
+  (doseq [ch channels]
+    (server/send! ch data)))
+
 (def cli-opts
   [["-p" "--port PORT" "port to serve on"
     :default 8888
@@ -45,6 +49,4 @@
   (watch (.getAbsolutePath (io/file path))
          (fn []
            (println "Changes detected")
-           (let [data (slurp path)]
-             (doseq [ch @channels]
-               (server/send! ch data))))))
+           (broadcast! @channels (slurp path)))))
