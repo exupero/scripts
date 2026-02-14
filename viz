@@ -6,9 +6,13 @@
             [clojure.tools.cli :as cli]
             [hiccup2.core :as hiccup]
             [org.httpkit.server :as server]
+            config
             markdown
             serve
-            watcher))
+            watcher)
+  (:import [java.net ServerSocket]))
+
+(def config-path (config/read-yaml :viz))
 
 (def bootstrap-script
   "
@@ -32,7 +36,7 @@ listenOnWebsocket();
   (with-open [sock (ServerSocket. 0)]
     (.getLocalPort sock)))
 
-(defn app [{:keys [uri]}]
+(defn app [_]
   {:status 200
    :body (str
            "<!DOCTYPE html>\n"
