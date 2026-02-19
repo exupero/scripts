@@ -1,0 +1,59 @@
+#!/usr/bin/env bb
+
+(ns venn
+  (:require [cheshire.core :as json]
+            [hiccup2.core :as hiccup]))
+
+(defn polar [r degrees]
+  (let [theta (Math/toRadians degrees)]
+    [(* r (Math/cos theta))
+     (- (* r (Math/sin theta)))]))
+
+(defn translate [x y]
+  (str "translate(" x "," y ")"))
+
+(defn angle [i n]
+  (+ (* 360 (/ i n)) 90))
+
+(defn svg [labels]
+  (let [n (count (into #{} (mapcat name) (keys labels)))
+        r 100
+        d 75
+        h (* d (Math/sqrt 3) 0.5)]
+    [:svg {:width 400 :height 400 :viewBox "0 0 400 400"}
+     [:g {:transform (translate 200 200)}
+      [:g
+       (for [i (range n)]
+         [:circle {:transform (apply translate (polar d (angle i n)))
+                   :r r
+                   :stroke "black"
+                   :stroke-width 2
+                   :fill :transparent}])]
+      [:g
+       (for [[i ks] (map-indexed vector [:A :B :C])]
+         [:text {:transform (apply translate (polar r (angle i n)))
+                 :text-anchor :middle
+                 :alignment-baseline :middle}
+          (labels ks)])
+       (for [[i ks] (map-indexed vector [:AB :BC :AC])]
+         [:text {:transform (apply translate (polar h (angle (+ i 0.5) n)))
+                 :text-anchor :middle
+                 :alignment-baseline :middle}
+          (labels ks)])
+       [:text {:text-anchor :middle
+               :alignment-baseline :middle}
+        (labels :ABC)]]]]))
+
+(when (= *file* (System/getProperty "babashka.file"))
+  (let [{:strs [labels]} (json/parse-string (slurp *in*))
+        labels (into {} (map (fn [[k v]]
+                               [(->> k sort (apply str) keyword)
+                                v]))
+                     labels)]
+    (println
+      (str
+        "<!DOCTYPE html>"
+        (hiccup/html
+          [:body
+           [:style "body { font-family: sans-serif; }"]
+           (svg labels)])))))

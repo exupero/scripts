@@ -1,0 +1,11 @@
+#!/usr/bin/env bb
+
+(ns browse-once
+  (:require [clojure.java.io :as io]
+            browse))
+
+(def static-path
+  (str (.getParent (io/file *file*)) "/static"))
+
+(when (= *file* (System/getProperty "babashka.file"))
+  (browse/browse-once (slurp *in*) static-path))
