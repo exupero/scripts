@@ -2,14 +2,16 @@
 
 set -e
 
-depth=${1:-1}
-
 mainBranch=$(git remote show origin | grep 'HEAD branch' | cut -d' ' -f5)
-directories=$(git diff $mainBranch... --name-only | cut -d/ -f1-$depth | sort -u | fzf)
+toRevert=$(git diff $mainBranch... --name-only | directories-and-files | sort -u | fzf --ansi \
+  --disabled \
+  --bind 'j:down,k:up,q:abort' \
+  --preview="git diff $mainBranch... -- {}" \
+  --preview-window=right:60%)
 
-if [ -z "$directories" ]; then
-  echo "No directories selected."
+if [ -z "$toRevert" ]; then
+  echo "No directories or files selected."
   exit 1
 fi
 
-git diff $mainBranch... -R -- $directories | patch -p1
+git diff $mainBranch... -R -- $toRevert | patch -p1

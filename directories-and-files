@@ -1,0 +1,17 @@
+#!/usr/bin/env bb
+
+(ns directories-and-files
+  (:require [clojure.string :as str]))
+
+; Given a list of paths on stdin, return all the parent directories and individual files
+
+(defn directories-and-file [path]
+  (->> (str/split path #"/")
+       (reductions conj [])
+       (map #(str/join "/" %))
+       (drop 1)))
+
+(let [paths (str/split-lines (slurp *in*))
+      entries (->> paths (mapcat directories-and-file) distinct sort)]
+  (doseq [entry entries]
+    (println entry)))
