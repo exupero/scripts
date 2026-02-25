@@ -2,7 +2,7 @@
 
 set -e
 
-cmd=$*
+cmd=$(printf " %q" "$@")
 
 # Find the non-active pane
 target=.$(tmux list-panes -F '#{pane_active} #{pane_index}' | grep -v '^1 ' | cut -d' ' -f2 | head -n 1)
@@ -15,4 +15,4 @@ fi
 # Ensure pane is not in copy mode
 tmux send -t "$target" -X cancel 2>/dev/null || true
 
-tmux send -t "$target" "$*" C-m
+tmux send -t "$target" "$cmd" C-m
