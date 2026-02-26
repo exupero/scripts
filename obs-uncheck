@@ -1,0 +1,4 @@
+#!/bin/bash
+
+# Full path to 'sponge' so Obsidian's Shell Commands plugin can find it
+cat "$1" | sed -E 's/- \[x\]/- [ ]/g' | /opt/homebrew/bin/sponge "$1"
