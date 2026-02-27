@@ -12,7 +12,7 @@ csv clojure.data.csv
 curl babashka.curl
 d ^{huahaiy/datalevin "0.9.22"} ^:pod pod.huahaiy.datalevin
 deps babashka.deps
-deep-diff ^{lambdaisland/deep-diff2 "2.11.216"} lambdaisland.deep-diff2
+ddiff ^{lambdaisland/deep-diff2 "2.11.216"} lambdaisland.deep-diff2
 dtf ^{com.widdindustries/cljc.java-time "0.1.21"} cljc.java-time.format.date-time-formatter
 e ^{etaoin/etaoin "1.0.40"} etaoin.api
 e.dev ^{etaoin/etaoin "1.0.40"} etaoin.dev
