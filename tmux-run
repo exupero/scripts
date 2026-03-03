@@ -2,7 +2,7 @@
 
 set -e
 
-cmd=$(printf " %q" "$@")
+cmd=$(printf "%q " "$@")
 
 # Find the non-active pane
 target=.$(tmux list-panes -F '#{pane_active} #{pane_index}' | grep -v '^1 ' | cut -d' ' -f2 | head -n 1)

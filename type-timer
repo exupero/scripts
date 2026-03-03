@@ -1,0 +1,26 @@
+#!/bin/bash
+
+set -e
+
+target=$1
+
+# Record start time in nanoseconds
+start=$(date +%s%N)
+
+# Get the user's input
+read -r attempt
+
+# Record end time in nanoseconds
+end=$(date +%s%N)
+
+# Calculate elapsed time in milliseconds
+elapsed_ms=$(( (end - start) / 1000000 ))
+elapsed_sec=$(echo "scale=3; $elapsed_ms / 1000" | bc)
+
+echo
+if [[ "$attempt" == "$target" ]]; then
+  echo "✅ Correct! You typed \"$target\" in ${elapsed_sec}s."
+else
+  echo "❌ Incorrect. You typed \"$attempt\" but the target was \"$target\"."
+  echo "   Time: ${elapsed_sec}s (but it doesn't count!)"
+fi
