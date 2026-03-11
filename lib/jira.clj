@@ -98,3 +98,25 @@
   (configure-request
     {:path (str "/project/" (normalize-project-key project) "/versions")
      :method :get}))
+
+(defn epic-issues [epic-key]
+  (configure-request
+    {:path (str "/epic/" epic-key "/issue")
+     :method :get
+     :query-params {:maxResults 100}}))
+
+(defn crawl-links [ticket]
+  (loop [seen #{(ticket :key)}
+         new-tickets #{ticket}
+         res [ticket]]
+    (if-let [new-linked (seq (sequence
+                               (comp
+                                 (mapcat (fn [{{:keys [issuelinks]} :fields}]
+                                           (mapcat linked-keys issuelinks)))
+                                 (remove seen))
+                               new-tickets))]
+      (let [linked-tickets (pmap #(-> (ticket %) http/request!!) new-linked)]
+        (recur (into seen (map :key linked-tickets))
+               linked-tickets
+               (concat res linked-tickets)))
+      res)))
