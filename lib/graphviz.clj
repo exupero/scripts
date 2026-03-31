@@ -30,9 +30,10 @@
     (node sb n))
   (append sb "\n  }"))
 
-(defn graph [{:keys [attrs nodes edges]}]
+(defn graph [{:keys [attrs nodes edges direction dpi]
+              :or {direction :TB dpi 300}}]
   (let [sb (StringBuilder.)]
-    (append sb "digraph {\n  graph [dpi=300]\n")
+    (append sb "digraph {\n  rankdir=\"" (name direction) "\"\n  graph [dpi=" dpi "]\n")
     (doseq [[k v] attrs]
       (doto sb
         (append "  " (name k) " [")
