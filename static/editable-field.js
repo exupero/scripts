@@ -6,18 +6,25 @@ class EditableField extends HTMLElement {
     this._value = '';
     this._showingPlaceholder = false;
     this._internalFocusChange = false;
-    this.contentEditable = 'true';
-    this.spellcheck = false;
   }
 
   connectedCallback() {
-    this._renderPlaceholder();
+    this.contentEditable = 'true';
+    this.spellcheck = false;
+
+    const initialValue = this.innerText.trim();
+    if (initialValue !== '') {
+      this._value = initialValue;
+      this._reflectEmptyAttr();
+    } else {
+      this._renderPlaceholder();
+    }
     this.addEventListener('focus',   this._onFocus);
     this.addEventListener('blur',    this._onBlur);
     this.addEventListener('input',   this._onInput);
     this.addEventListener('keydown', this._onKeydown);
     this.addEventListener('paste',   this._onPaste);
-    if (this.hasAttribute('focused')) { requestAnimationFrame(() => this.focus()); }
+    if (this.hasAttribute('focused')) requestAnimationFrame(() => this.focus());
   }
 
   disconnectedCallback() {
@@ -108,7 +115,8 @@ class EditableField extends HTMLElement {
     }));
   };
 
-  _onInput = () => {
+  _onInput = (e) => {
+    if (!e.isTrusted) return; // Ignore programmatic changes
     if (this._showingPlaceholder) return;
 
     this._value = this.innerText;

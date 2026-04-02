@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<head>
+  <title>Web components demo</title>
+  <meta charset="utf-8" />
+  <script src="editable-field.js"></script>
+  <script src="editable-list.js"></script>
+  <script src="conflict-resolution-diagram.js"></script>
+  <style>
+body {
+  font-family: sans-serif;
+}
+  </style>
+</head>
+<body>
+  <h1>Web components demo</h1>
+
+  <h2>editable-field</h2>
+  <h3>Default with a value</h3>
+  <div><editable-field>Hello</editable-field></div>
+  <h3>With a placeholder</h3>
+  <div><editable-field placeholder="with a placeholder"></editable-field></div>
+
+  <h2>editable-list</h2>
+  <div>
+    <editable-list>
+      <template>
+        <input type="text" />
+      </template>
+    </editable-list>
+  </div>
+
+  <h2>conflict-resolution-diagram</h2>
+  <h3>Blank</h3>
+  <!-- <div> -->
+  <!--   <conflict-resolution-diagram></conflict-resolution-diagram> -->
+  <!-- </div> -->
+  <h3>Pre-populated</h3>
+  <div>
+    <conflict-resolution-diagram>
+      <script type="application/json">
+        {
+          "req1": "Req 1",
+          "req2": "Req 2",
+          "obj1": "Objective 1",
+          "obj2": "Objective 2",
+          "goal": "Goal",
+          "conflict": ["A", "B", "C"],
+          "required1": ["D", "E", "F"],
+          "required2": ["G", "H", "I"],
+          "objective1": ["J", "K", "L"],
+          "objective2": ["M", "N", "O"]
+        }
+      </script>
+    </conflict-resolution-diagram>
+  </div>
+</body>
