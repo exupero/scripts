@@ -31,9 +31,9 @@ body {
 
   <h2>conflict-resolution-diagram</h2>
   <h3>Blank</h3>
-  <!-- <div> -->
-  <!--   <conflict-resolution-diagram></conflict-resolution-diagram> -->
-  <!-- </div> -->
+  <div>
+    <conflict-resolution-diagram></conflict-resolution-diagram>
+  </div>
   <h3>Pre-populated</h3>
   <div>
     <conflict-resolution-diagram>
@@ -44,11 +44,13 @@ body {
           "obj1": "Objective 1",
           "obj2": "Objective 2",
           "goal": "Goal",
-          "conflict": ["A", "B", "C"],
-          "required1": ["D", "E", "F"],
-          "required2": ["G", "H", "I"],
-          "objective1": ["J", "K", "L"],
-          "objective2": ["M", "N", "O"]
+          "assumptions": {
+            "conflict": ["A", "B", "C"],
+            "req1": ["D", "E", "F"],
+            "req2": ["G", "H", "I"],
+            "obj1": ["J", "K", "L"],
+            "obj2": ["M", "N", "O"]
+          }
         }
       </script>
     </conflict-resolution-diagram>

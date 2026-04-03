@@ -72,35 +72,11 @@ template.innerHTML = `
 <editable-field class="box obj2"></editable-field>
 <editable-field class="box goal"></editable-field>
 
-<editable-list class="assumptions assumptions--middle assumptions-conflict">
-  <template>
-    <input type="text" />
-  </template>
-</editable-list>
-
-<editable-list class="assumptions assumptions--bottom assumptions-req1">
-  <template>
-    <input type="text" />
-  </template>
-</editable-list>
-
-<editable-list class="assumptions assumptions--top assumptions-req2">
-  <template>
-    <input type="text" />
-  </template>
-</editable-list>
-
-<editable-list class="assumptions assumptions--bottom assumptions-obj1">
-  <template>
-    <input type="text" />
-  </template>
-</editable-list>
-
-<editable-list class="assumptions assumptions--top assumptions-obj2">
-  <template>
-    <input type="text" />
-  </template>
-</editable-list>
+<editable-list class="assumptions assumptions--middle assumptions-conflict"></editable-list>
+<editable-list class="assumptions assumptions--bottom assumptions-req1"></editable-list>
+<editable-list class="assumptions assumptions--top assumptions-req2"></editable-list>
+<editable-list class="assumptions assumptions--bottom assumptions-obj1"></editable-list>
+<editable-list class="assumptions assumptions--top assumptions-obj2"></editable-list>
 
 <div class="connector conflict">|</div>
 <div class="connector objective-requirement-1">&larr;</div>
@@ -150,8 +126,28 @@ class ConflictResolutionDiagram extends HTMLElement {
     }
   }
 
+  _addItems(listEl, items) {
+    items.forEach(item => {
+      const input = document.createElement('input');
+      input.type = 'text';
+      input.value = item;
+      listEl.addItem(input);
+    });
+  }
+
   _populate(data) {
-    console.log(data);
+    const root = this.shadowRoot;
+
+    root.querySelector('.req1').value = data.req1 || '';
+    root.querySelector('.req2').value = data.req2 || '';
+    root.querySelector('.obj1').value = data.obj1 || '';
+    root.querySelector('.obj2').value = data.obj2 || '';
+    root.querySelector('.goal').value = data.goal || '';
+    this._addItems(root.querySelector('.assumptions-conflict'), data.assumptions.conflict || []);
+    this._addItems(root.querySelector('.assumptions-req1'), data.assumptions.req1 || []);
+    this._addItems(root.querySelector('.assumptions-req2'), data.assumptions.req2 || []);
+    this._addItems(root.querySelector('.assumptions-obj1'), data.assumptions.obj1 || []);
+    this._addItems(root.querySelector('.assumptions-obj2'), data.assumptions.obj2 || []);
   }
 }
 
