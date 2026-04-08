@@ -35,12 +35,14 @@ template.innerHTML = `
 }
 
 .assumption {
-  display: flex;
-
-  .field[empty] {
+  .field[empty], .invalidation[empty] {
     color: #aaa;
     font-style: italic;
   }
+}
+
+.invalidation {
+  display: flex;
 }
 
 .assumptions {
@@ -73,6 +75,11 @@ template.innerHTML = `
 <template class="assumption-template">
   <div class="assumption">
     <editable-field class="field" placeholder="Assumption"></editable-field>
+    <editable-list class="invalidations">
+      <template>
+        <editable-field class="invalidation" placeholder="Invalidation"></editable-field>
+      </template>
+    </editable-list>
   </div>
 </template>
 
