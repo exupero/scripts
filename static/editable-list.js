@@ -64,7 +64,6 @@ class EditableList extends HTMLElement {
         bubbles: true,
         composed: true,
         cancelable: true,
-        detail: {addItem: (node) => this.addItem(node)},
       }));
     }
   }

@@ -31,13 +31,16 @@ template.innerHTML = `
 .assumptions-req2        { grid-area: o; }
 .assumptions-obj2        { grid-area: p; }
 
+.editable-list-item {
+}
+
 .assumption {
-  text-align: left;
-  display: grid;
-  grid-template-columns: 1.5rem 1fr 1.5rem;
-  gap: 0.5rem;
-  align-items: start;
-  margin-bottom: 0.5rem;
+  display: flex;
+
+  .field[empty] {
+    color: #aaa;
+    font-style: italic;
+  }
 }
 
 .assumptions {
@@ -66,6 +69,13 @@ template.innerHTML = `
   text-align: center;
 }
 </style>
+
+<template class="assumption-template">
+  <div class="assumption">
+    <editable-field class="field" placeholder="Assumption"></editable-field>
+  </div>
+</template>
+
 <editable-field class="box req1"></editable-field>
 <editable-field class="box req2"></editable-field>
 <editable-field class="box obj1"></editable-field>
@@ -126,12 +136,19 @@ class ConflictResolutionDiagram extends HTMLElement {
     }
   }
 
-  _addItems(listEl, items) {
+  _initAssumptions(listEl, items) {
+    const template = this.shadowRoot.querySelector('.assumption-template');
     items.forEach(item => {
-      const input = document.createElement('input');
-      input.type = 'text';
-      input.value = item;
-      listEl.addItem(input);
+      const assumption = template.content.cloneNode(true);
+      // These steps have to be in this order, with the field selected before
+      // being added to the list, then the value set after being added to the
+      // list.
+      const field = assumption.querySelector('.field');
+      listEl.addItem(assumption);
+      field.value = item;
+    });
+    listEl.addEventListener('create-item', e => {
+      listEl.addItem(template.content.cloneNode(true));
     });
   }
 
@@ -143,11 +160,12 @@ class ConflictResolutionDiagram extends HTMLElement {
     root.querySelector('.obj1').value = data.obj1 || '';
     root.querySelector('.obj2').value = data.obj2 || '';
     root.querySelector('.goal').value = data.goal || '';
-    this._addItems(root.querySelector('.assumptions-conflict'), data.assumptions.conflict || []);
-    this._addItems(root.querySelector('.assumptions-req1'), data.assumptions.req1 || []);
-    this._addItems(root.querySelector('.assumptions-req2'), data.assumptions.req2 || []);
-    this._addItems(root.querySelector('.assumptions-obj1'), data.assumptions.obj1 || []);
-    this._addItems(root.querySelector('.assumptions-obj2'), data.assumptions.obj2 || []);
+
+    this._initAssumptions(root.querySelector('.assumptions-conflict'), data.assumptions.conflict || []);
+    this._initAssumptions(root.querySelector('.assumptions-req1'), data.assumptions.req1 || []);
+    this._initAssumptions(root.querySelector('.assumptions-req2'), data.assumptions.req2 || []);
+    this._initAssumptions(root.querySelector('.assumptions-obj1'), data.assumptions.obj1 || []);
+    this._initAssumptions(root.querySelector('.assumptions-obj2'), data.assumptions.obj2 || []);
   }
 }
 
