@@ -1,4 +1,4 @@
 {:paths ["bb"]
  :tasks {server (apply shell "npx shadow-cljs server" *command-line-args*)
          test (apply shell "npx shadow-cljs compile test --config-merge '{:autorun true}'" *command-line-args*)
-         watch (apply shell "npx shadow-cljs watch app portfolio -A dev" *command-line-args*)}}
+         watch (apply shell "npx shadow-cljs watch app portfolio -A dev:local" *command-line-args*)}}
