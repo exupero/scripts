@@ -112,3 +112,10 @@
      {:path (str "/repos/" (name owner) "/" (name repo) "/pulls/" number "/reviews/" review-id "/events")
       :method :post
       :body {:event event}})))
+
+(defn submit-pending-review! [org repo number verdict]
+  (let [{:keys [id]} (->> (reviews org repo number)
+                          http/request!
+                          (filter (comp #{"PENDING"} :state)))]
+    (-> (new-review-event org repo number id (or verdict "COMMENT"))
+        http/request!)))
