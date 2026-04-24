@@ -93,3 +93,22 @@
      {:path (str "/repos/" (name owner) "/" (name repo) "/issues/" number "/comments")
       :method :post
       :body {:body body}})))
+
+(defn reviews
+  ([repo number]
+   (let [[owner repo] (owner+repo repo)]
+     (reviews owner repo number)))
+  ([owner repo number]
+   (configure-request
+     {:path (str "/repos/" (name owner) "/" (name repo) "/pulls/" number "/reviews")
+      :method :get})))
+
+(defn new-review-event
+  ([repo number review-id event]
+   (let [[owner repo] (owner+repo repo)]
+     (new-review-event owner repo number review-id event)))
+  ([owner repo number review-id event]
+   (configure-request
+     {:path (str "/repos/" (name owner) "/" (name repo) "/pulls/" number "/reviews/" review-id "/events")
+      :method :post
+      :body {:event event}})))
