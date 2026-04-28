@@ -1,5 +1,6 @@
 (ns github
-  (:require [clojure.string :as str]))
+  (:require [clojure.string :as str]
+            http))
 
 (def host "https://api.github.com")
 (def token (System/getenv "GITHUB_TOKEN"))
