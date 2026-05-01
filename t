@@ -2,7 +2,6 @@
 
 (ns t
   (:require [clojure.java.io :as io]
-            [clojure.pprint :as pprint]
             [clojure.string :as str]
             [babashka.deps :as deps]
             [babashka.process :as p]
