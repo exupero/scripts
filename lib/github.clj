@@ -37,7 +37,7 @@
   (configure-request
     {:path "/search/issues"
      :method :get
-     :query-params {:q q}}))
+     :query-params {:q q :per_page 100}}))
 
 (defn search-repos [q]
   (configure-request
@@ -120,3 +120,12 @@
                           (filter (comp #{"PENDING"} :state)))]
     (-> (new-review-event org repo number id (or verdict "COMMENT"))
         http/request!)))
+
+(defn pr-files
+  ([repo number]
+   (let [[owner repo] (owner+repo repo)]
+     (pr-files owner repo number)))
+  ([owner repo number]
+   (configure-request
+     {:path (str "/repos/" (name owner) "/" (name repo) "/pulls/" number "/files")
+      :method :get})))
