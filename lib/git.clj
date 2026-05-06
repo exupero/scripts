@@ -1,6 +1,7 @@
 (ns git
   (:require [clojure.java.shell :as shell]
-            [clojure.string :as str]))
+            [clojure.string :as str]
+            xforms))
 
 (defn run [& cmd]
   (let [{:keys [out err exit]} (apply shell/sh cmd)]
@@ -45,3 +46,17 @@
   (let [{:keys [out exit]} (shell/sh "git" "remote" "get-url" "origin")]
     (when (zero? exit)
       (str/trim out))))
+
+(defn-with-dir worktrees []
+  (let [{:keys [out]} (shell/sh "git" "worktree" "list" "--porcelain")]
+    (->> out
+         str/split-lines
+         (sequence
+           (comp
+             (xforms/split-by str/blank?)
+             (map (partial remove str/blank?))))
+         (map (fn [[path _ branch]]
+                (let [[_ path] (str/split path #"\s+" 2)
+                      [_ branch] (str/split branch #"\s+" 2)]
+                  {:branch branch
+                   :path path}))))))
