@@ -14,7 +14,7 @@
                    ctx)
    :after-effect (fn [{:keys [errors] :as ctx}]
                    (when (seq errors)
-                     (js/console.error "⚠️ Error eexecuting effect")
+                     (js/console.error "⚠️ Error executing effect")
                      (prn errors))
                    ctx)})
 

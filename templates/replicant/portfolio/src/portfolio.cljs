@@ -4,7 +4,7 @@
             [replicant.dom :as r]
             {{name}}.ui))
 
-(defscene main
+(defscene main-component
   [{{name}}.ui/main {}])
 
 (defn main []
