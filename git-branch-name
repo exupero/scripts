@@ -1,3 +1,4 @@
 #!/bin/bash
 
-git rev-parse --abbrev-ref HEAD | tr -d '\n'
+git branch --show-current | tr -d '\n'
+# git rev-parse --abbrev-ref HEAD | tr -d '\n'
