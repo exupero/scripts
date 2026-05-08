@@ -70,7 +70,7 @@
   (ensure-directory! dir)
   (ensure-directory! (str dir "/_templates"))
   (spit (str dir "/_templates/generic.md")
-        "---\ncreated: {{datestamp}}\ntype: {{type}}\n---\n\n# {{title|safe}}"))
+        "---\ncreated: '{{datestamp}}'\ntype: {{type}}\n---\n\n# {{title|safe}}"))
 
 (defmethod execute :list [_ {[status] :args :keys [dir]}]
   (let [files (->> (io/file dir)
