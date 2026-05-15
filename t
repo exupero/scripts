@@ -80,7 +80,9 @@
                        (remove #(.isDirectory %))
                        (map (fn [file]
                               (let [[{:keys [created type status]} content] (markdown/frontmatter+content (slurp file))]
-                                {:created (.format (SimpleDateFormat. "yyyy-MM-dd") created)
+                                {:created (if (instance? java.util.Date created)
+                                             (.format (SimpleDateFormat. "yyyy-MM-dd") created)
+                                             created)
                                  :type type
                                  :status (or status "todo")
                                  :title (parse-title content)})))
