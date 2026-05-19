@@ -9,32 +9,43 @@
             util))
 
 (def sorters
-  {:additions (fn [lines]
-                (->> lines
+  {:additions (fn [text]
+                (->> text
                      str/split-lines
                      (filter #(str/starts-with? % "+"))
                      count
                      -))
    :alphabetical identity
-   :deletions (fn [lines]
-                (->> lines
+   :deletions (fn [text]
+                (->> text
                      str/split-lines
                      (filter #(str/starts-with? % "-"))
                      count
                      -))
-   :similarity (fn [lines]
-                 (let [additions (->> lines
+   :percent-deletions (fn [text]
+                       (let [lines (str/split-lines text)
+                             total (->> lines
+                                        (filter #(re-find #"^[ +-]" %))
+                                        count)
+                             deletions (->> lines
+                                            (filter #(str/starts-with? % "-"))
+                                            count)]
+                         (if (zero? total)
+                           0
+                           (- (/ deletions total)))))
+   :similarity (fn [text]
+                 (let [additions (->> text
                                       str/split-lines
                                       (filter #(str/starts-with? % "+"))
                                       count)
-                       deletions (->> lines
+                       deletions (->> text
                                       str/split-lines
                                       (filter #(str/starts-with? % "-"))
                                       count)]
                    (Math/abs (- additions deletions))))
    :size (comp count str/split-lines)
-   :test (fn [lines]
-           (let [[line] (str/split-lines lines)]
+   :test (fn [text]
+           (let [[line] (str/split-lines text)]
              (if (re-find #"\btests?\b" line) 1 0)))})
 
 (let [[metric] *command-line-args*]
