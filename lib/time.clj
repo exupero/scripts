@@ -46,6 +46,9 @@
       (.withSecond 0)
       (.withNano 0)))
 
+(defn parse-datetime [d]
+  (odt/parse d))
+
 (defn parse-date [d]
   (.atStartOfDay (ld/parse d)
                  (java.time.ZoneId/systemDefault)))
