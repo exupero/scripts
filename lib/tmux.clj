@@ -1,6 +1,7 @@
 (ns tmux
   (:refer-clojure :exclude [send filter])
-  (:require [clojure.string :as str]
+  (:require [clojure.java.io :as io]
+            [clojure.string :as str]
             [clojure.walk :as walk]
             [babashka.process :as p]))
 
@@ -106,6 +107,16 @@
 
 (defn last-line [pane]
   (last (last-command-lines pane)))
+
+(defn sessions []
+  (set (tmux-lines :list-sessions :F "#{session_name}")))
+
+(defn session-dirs []
+  (into {}
+        (map (fn [s]
+               (let [[session path] (str/split s #"\s+" 2)]
+                 [session (.getCanonicalFile (io/file path))])))
+        (tmux-lines :list-sessions :F "#{session_name} #{session_path}")))
 
 (defn sessions-with-windows-named [nm]
   (set (tmux-lines :list-panes :aF "#{session_name}" :f (str "#{m:" nm ",#{window_name}}"))))
