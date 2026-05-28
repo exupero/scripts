@@ -39,6 +39,12 @@
          end# (System/nanoTime)]
      [(- end# start#) res#]))
 
+(defn start-of-today []
+  (-> (java.time.LocalDate/now)
+      (.atStartOfDay)
+      (.atZone (java.time.ZoneId/systemDefault))
+      (.toEpochSecond)))
+
 (defn start-of-day [t]
   (-> t
       (.withHour 0)
