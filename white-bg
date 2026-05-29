@@ -2,4 +2,4 @@
 
 # Sometimes needed for PNGs that have a transparent background and don't show
 # up well on certain websites
-convert $1 -background white -alpha remove -alpha off $2
+magick convert $1 -background white -alpha remove -alpha off $2
