@@ -1,16 +1,11 @@
-#!/usr/bin/env bb
+#!/bin/bash
 
-(ns collect
-  (:require [clojure.java.io :as io]))
-
-(when (= *file* (System/getProperty "babashka.file"))
-  (let [[pattern] *command-line-args*
-        pattern (re-pattern pattern)
-        collected (atom [])]
-    (doseq [line (line-seq (io/reader *in*))]
-      (when (re-find pattern line)
-        (swap! collected conj line))
-      (println line))
-    (println "\n=== COLLECTED ===")
-    (doseq [line @collected]
-      (println line))))
+awk -v pattern="$1" '
+{
+  print
+  if ($0 ~ pattern) collected[n++] = $0
+}
+END {
+  print "\n===COLLECTED==="
+  for (i = 0; i < n; i++) print collected[i]
+}'
