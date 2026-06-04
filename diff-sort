@@ -46,7 +46,7 @@
    :size (comp count str/split-lines)
    :test (fn [text]
            (let [[line] (str/split-lines text)]
-             (if (re-find #"\btests?\b" line) 1 0)))})
+             (if (re-find #"\btests?\b|_tests\.py" line) 1 0)))})
 
 (let [[metric] *command-line-args*]
   (when-not metric
