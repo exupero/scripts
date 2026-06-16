@@ -55,6 +55,17 @@
       :method :post
       :body {:labels labels}})))
 
+(defn pr-number
+  ([repo branch]
+   (let [[owner repo] (owner+repo repo)]
+     (pr-number owner repo branch)))
+  ([owner repo branch]
+   (configure-request
+     {:path (str "/repos/" (name owner) "/" (name repo) "/pulls")
+      :method :get
+      :query-params {:head (str (name owner) ":" branch)}
+      :getter #(-> % :body first :number)})))
+
 (defn new-pull-request
   ([repo params]
    (let [[owner repo] (owner+repo repo)]
@@ -62,6 +73,16 @@
   ([owner repo params]
    (configure-request
      {:path (str "/repos/" (name owner) "/" (name repo) "/pulls")
+      :method :post
+      :body params})))
+
+(defn update-pull-request
+  ([repo number params]
+   (let [[owner repo] (owner+repo repo)]
+     (update-pull-request owner repo number params)))
+  ([owner repo number params]
+   (configure-request
+     {:path (str "/repos/" (name owner) "/" (name repo) "/pulls/" number)
       :method :post
       :body params})))
 
