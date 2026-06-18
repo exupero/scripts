@@ -7,8 +7,15 @@
             xforms)
   (:import [java.io File]))
 
+(defmacro with-tempfile [[nm prefix suffix] & body]
+  `(let [~nm (File/createTempFile ~prefix ~suffix)]
+     (try
+       ~@body
+       (finally
+         (.delete ~nm)))))
+
 (defn parse [extension code]
-  (let [tempfile (File/createTempFile "tree-sitter-" (str \. (name extension)))]
+  (with-tempfile [tempfile "tree-sitter-" (str \. (name extension))]
     (spit tempfile code)
     (->> (p/shell {:out :string :err :string} "tree-sitter parse" (.getAbsolutePath tempfile) "--xml")
          :out
@@ -48,8 +55,8 @@
     (str/split-lines s)))
 
 (defn query [query paths]
-  (let [tempfile (File/createTempFile "tree-sitter-query-" ".scm")
-        _ (spit tempfile query)]
+  (with-tempfile [tempfile "tree-sitter-query-" ".scm"]
+    (spit tempfile query)
     (-> (apply p/shell {:out :string :err :string} "tree-sitter query" (.getAbsolutePath tempfile) paths)
         :out
         parse-results)))
