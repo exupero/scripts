@@ -3,12 +3,14 @@
 (ns checkin
   (:require [clojure.java.io :as io]
             [clojure.string :as str]
+            [clojure.tools.cli :as cli]
             [babashka.process :as p]
-            cli
             git))
 
-(cli/with-opts [[[-p --preview "don't check in, instead show repo status"]]
-                [env-var-suffix]]
+(def cli-opts
+  [["-p" "--preview" "don't check in, instead show repo status"]])
+
+(let [{{:keys [preview?]} :options [env-var-suffix] :arguments} (cli/parse-opts *command-line-args* cli-opts)]
   (let [env-var-name (cond-> "CHECKIN_PATHS"
                        env-var-suffix (str \_ (str/upper-case env-var-suffix)))
         paths (System/getenv env-var-name)
@@ -23,7 +25,7 @@
         (when (git/changes? repo)
           (println (.getAbsolutePath repo))
           (p/shell {:dir repo} "git -c color.ui=always status --short")
-          (when-not preview
+          (when-not preview?
             (p/shell {:dir repo
                       :extra-env {"PROMPT_OVERRIDE" (str "Staging changes in " repo "; 'exit' or C-d when done\n> ")}
                       :continue true}
