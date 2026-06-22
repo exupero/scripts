@@ -16,4 +16,5 @@
   (render)
   (add-watch {{name}}.db/store ::render
              (fn [_ _ _ state]
-               (r/render el ({{name}}.ui/main state)))))
+               (r/render el ({{name}}.ui/main state))))
+  (nxr/dispatch {{name}}.db/store nil [[:effect/init]]))

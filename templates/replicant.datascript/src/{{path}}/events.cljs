@@ -13,4 +13,7 @@
 
 (nxr/register-effect! :effect/transact
   (fn [_ conn data]
-    (d/transact! conn data)))
+    (try
+      (d/transact! conn data)
+      (catch js/Error e
+        (js/console.error "Transaction failed:" e)))))
