@@ -40,9 +40,10 @@
 (defn read-map [nm]
   (read-as nm "{%s}"))
 
-(defn read-yaml [nm]
-  (yaml/parse-string
-    (content (str (name nm) ".yaml"))))
+(defn read-yaml [nm & opts]
+  (apply yaml/parse-string
+         (content (str (name nm) ".yaml"))
+         opts))
 
 (defn write! [nm value]
   (->> value
