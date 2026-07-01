@@ -46,11 +46,11 @@
   (let [nmsps (namespaces forms)
         syms (symbols forms)
         known (keep (fn [[nm nmsp]]
-                      (let [{:keys [pod refer] :as m} (meta nmsp)
+                      (let [{:keys [pod refer reload?] :as m} (meta nmsp)
                             [[dep version]] (filter (comp symbol? key) m)
                             referred (seq (filter syms refer))]
                         (when (or (nmsps nm) (nmsps nmsp) referred)
-                          (cond-> {:namespace nmsp}
+                          (cond-> {:namespace nmsp :reload? reload?}
                             (and (nmsps nm) (not= nm nmsps))
                             , (assoc :as nm)
                             referred
@@ -114,9 +114,10 @@
      :pods (map (fn [{:keys [pod version]}]
                   [pod version])
                 pods)
-     :requires (->> base
-                    (filter (some-fn :dep :pod))
-                    deps)}))
+     :requires (-> base
+                   (->> (filter (some-fn :dep :pod)))
+                   deps)
+     :reload? (some :reload? base)}))
 
 (comment
   (clojure.pprint/pprint
@@ -160,13 +161,14 @@
             (interpose (n/forms-node [(n/newlines 1) (n/spaces 12)])))
           ns-requires)))
 
-(defn require-node [ns-requires]
+(defn require-node [ns-requires reload?]
   (n/list-node
-    (into ['require (n/spaces 1)]
-          (comp
-            (map #(n/quote-node (require-form %)))
-            (interpose (n/forms-node [(n/newlines 1) (n/spaces 9)])))
-          ns-requires)))
+    (-> (into ['require (n/spaces 1)]
+              (comp
+                (map #(n/quote-node (require-form %)))
+                (interpose (n/forms-node [(n/newlines 1) (n/spaces 9)])))
+              ns-requires)
+        (cond-> reload? (conj (n/newlines 1) (n/spaces 9) :reload)))))
 
 (defn pods-node [pods]
   (n/forms-node
@@ -208,7 +210,7 @@
         loc
         (recur (-> loc' z/up z/remove* z/remove*))))))
 
-(defn update-requires [loc {:keys [ns-requires add-deps pods requires]}]
+(defn update-requires [loc {:keys [ns-requires add-deps pods requires reload?]}]
   (-> loc
       find-or-create-ns-require
       z/up
@@ -226,7 +228,7 @@
           z/right))
       (cond-> (seq requires)
         (->
-          (z/insert-right* (require-node requires))
+          (z/insert-right* (require-node requires reload?))
           (z/insert-newline-right)
           z/right))
       (remove-invocation 'deps/add-deps)
@@ -234,16 +236,18 @@
       (remove-invocation 'require)))
 
 (comment
-  (doseq [code ["(ns my-namespace)\n\n(str/replace)"
-                "(ns my-namespace)\n\n(str/replace)\n(xf/by-key)\n(p/submit)"
-                "(ns my-namespace\n  (:require [clojure.string :as str]))\n\n(str/replace)\n(xf/by-key)\n(portal/submit)"
-                "(ns my-namespace\n  (:require [clojure.string :as str]))\n(deps/add-deps '{:deps {something {}}})\n(require)\n\n(str/replace)\n(xf/by-key)\n(portal/submit)"
-                "(ns my-namespace)\n(web/launch)"
-                "(ns my-namespace)\n(pods/load-pods)\n(pods/load-pods)\n(sqlite/query)\n(pg/query)"
-                "(ns my-namespace)\n(-<>)"
-                "(ns my-namespace)\n(http/request)"]]
+  (doseq [code [
+                ; "(ns my-namespace)\n\n(str/replace)"
+                ; "(ns my-namespace)\n\n(str/replace)\n(xf/by-key)\n(p/submit)"
+                ; "(ns my-namespace\n  (:require [clojure.string :as str]))\n\n(str/replace)\n(xf/by-key)\n(portal/submit)"
+                ; "(ns my-namespace\n  (:require [clojure.string :as str]))\n(deps/add-deps '{:deps {something {}}})\n(require)\n\n(str/replace)\n(xf/by-key)\n(portal/submit)"
+                ; "(ns my-namespace)\n(web/launch)"
+                ; "(ns my-namespace)\n(pods/load-pods)\n(pods/load-pods)\n(sqlite/query)\n(pg/query)"
+                ; "(ns my-namespace)\n(-<>)"
+                ; "(ns my-namespace)\n(http/request)"
+                "(ns my-namespace) (babashka.cli/dispatch)"]]
     (-> (z/of-string code)
-        (as-> $ (update-requires $ (-> $ z/up z/sexpr new-requires)))
+        (as-> $ (update-requires $ #p (-> $ z/up z/sexpr new-requires)))
         z/root-string
         println)
     (println "---")))

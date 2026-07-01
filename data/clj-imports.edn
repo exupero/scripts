@@ -1,6 +1,6 @@
 async clojure.core.async
 b ^{backtick/backtick "0.3.5"} backtick
-babashka.cli ^{org.babashka/cli "0.12.75"} babashka.cli
+babashka.cli ^{org.babashka/cli "0.12.75" :reload? true} babashka.cli
 bling ^{io.github.paintparty/bling "0.10.0"} ^{:refer [bling]} bling.core
 bootleg ^{retrogradeorbit/bootleg "0.1.9"} ^:pod pod.retrogradeorbit.bootleg.utils
 c ^{clojure-term-colors/clojure-term-colors "0.1.0"} clojure.term.colors
