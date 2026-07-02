@@ -72,16 +72,30 @@
   (-> (tmux* {:err nil, :continue true} :has-session :t t)
       :exit zero?))
 
-(defn display-message [target fmt & args]
+(defn display-message [target message & args]
   (str/trim (apply tmux :display-message
                    (cond-> []
                      target (conj :t (name target))
                      (seq args) (into args)
-                     ; has to come last?
-                     true (conj :p fmt)))))
+                     true (conj message)))))
+
+(defn run-in-popup [target cmd & args]
+  (apply tmux :display-popup
+         (cond-> []
+           target (conj :t (name target))
+           (seq args) (into args)
+           true (conj cmd))))
+
+(defn display-popup [target message & args]
+  (apply run-in-popup target (str "echo " message) args))
+
+(defn get-message [target fmt & args]
+  (let [; -p needs to come last?
+        args (conj (into [] args) :p)]
+    (apply display-message target fmt args)))
 
 (defn session-name []
-  (display-message nil "#{session_name}"))
+  (get-message nil "#{session_name}"))
 
 (defn tmux-lines [cmd & args]
   (some-> (apply tmux cmd args) str/trim str/split-lines))
@@ -163,7 +177,7 @@
     form))
 
 (defn location []
-  (display-message nil "#{session_name}:#{window_index}.#{pane_index}"))
+  (get-message nil "#{session_name}:#{window_index}.#{pane_index}"))
 
 (defn active? []
   (boolean (System/getenv "TMUX")))

@@ -106,11 +106,12 @@
                       (->> (remove (some-fn :dep :pod)))
                       (cond-> (seq depd) (conj {:namespace 'babashka.deps :as 'deps}))
                       (cond-> (seq pods) (conj {:namespace 'babashka.pods :as 'pods}))
-                      deps)
+                      deps
+                      distinct)
      :add-deps (into (sorted-map)
                      (map (fn [{:keys [dep info]}]
                             [dep info]))
-                    depd)
+                     depd)
      :pods (map (fn [{:keys [pod version]}]
                   [pod version])
                 pods)
@@ -236,8 +237,7 @@
       (remove-invocation 'require)))
 
 (comment
-  (doseq [code [
-                ; "(ns my-namespace)\n\n(str/replace)"
+  (doseq [code [; "(ns my-namespace)\n\n(str/replace)"
                 ; "(ns my-namespace)\n\n(str/replace)\n(xf/by-key)\n(p/submit)"
                 ; "(ns my-namespace\n  (:require [clojure.string :as str]))\n\n(str/replace)\n(xf/by-key)\n(portal/submit)"
                 ; "(ns my-namespace\n  (:require [clojure.string :as str]))\n(deps/add-deps '{:deps {something {}}})\n(require)\n\n(str/replace)\n(xf/by-key)\n(portal/submit)"
@@ -245,7 +245,8 @@
                 ; "(ns my-namespace)\n(pods/load-pods)\n(pods/load-pods)\n(sqlite/query)\n(pg/query)"
                 ; "(ns my-namespace)\n(-<>)"
                 ; "(ns my-namespace)\n(http/request)"
-                "(ns my-namespace) (babashka.cli/dispatch)"]]
+                ; "(ns my-namespace) (babashka.cli/dispatch)"
+                "(ns my-namespace (:require clojure.pprint [babashka.deps :as deps])) (deps/add-deps) (babashka.cli/dispatch) (babashka.cli/dispatch)"]]
     (-> (z/of-string code)
         (as-> $ (update-requires $ #p (-> $ z/up z/sexpr new-requires)))
         z/root-string
