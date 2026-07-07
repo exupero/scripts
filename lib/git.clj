@@ -60,3 +60,7 @@
                       [_ branch] (str/split branch #"\s+" 2)]
                   {:branch branch
                    :path path}))))))
+
+(defn-with-dir branch-exists? [branch]
+  (let [{:keys [exit]} (shell/sh "git" "rev-parse" "--verify" branch)]
+    (zero? exit)))
