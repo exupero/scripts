@@ -38,6 +38,11 @@
   ([target & args]
    (apply tmux :split-window :h :t target args)))
 
+(defn split-vertical
+  ([] (tmux :split-window :h))
+  ([target & args]
+   (apply tmux :split-window :v :t target args)))
+
 (defn send [target & ss]
   (apply tmux :send :t (name target) (map name ss)))
 

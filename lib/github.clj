@@ -22,10 +22,14 @@
   (when-let [[_ org repo number] (re-find #"/([^/]+)/([^/]+)/pull/(\d+)" url)]
     [org repo number]))
 
-(defn pull-request [owner repo number]
-  (configure-request
-    {:path (str "/repos/" (name owner) "/" (name repo) "/pulls/" number)
-     :method :get}))
+(defn pull-request
+  ([repo number]
+   (let [[owner repo] (owner+repo repo)]
+     (pull-request owner repo number)))
+  ([owner repo number]
+   (configure-request
+     {:path (str "/repos/" (name owner) "/" (name repo) "/pulls/" number)
+      :method :get})))
 
 (defn search-code [q]
   (configure-request

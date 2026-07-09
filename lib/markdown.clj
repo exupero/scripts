@@ -63,3 +63,13 @@
              (yaml/generate-string (apply f fm args) :dumper-options {:flow-style :block})
              "---\n"
              content)))))
+
+(defn update-content [file f & args]
+  (text/update-file file
+    (fn [content]
+      (let [[fm content] (frontmatter-text+content content)]
+        (str "---\n"
+             fm
+             "\n---\n\n"
+             (-> (apply f content args)
+                 (str/replace #"\r" "")))))))
