@@ -49,8 +49,8 @@
 (defn submit [target & ss]
   (apply send target (concat ss ["C-m"])))
 
-(defn new-session [nm dir]
-  (tmux :new-session :d :s (name nm) :c (str dir)))
+(defn new-session [nm dir & args]
+  (apply tmux :new-session :d :s (name nm) :c (str dir) args))
 
 (defn switch-client [target]
   (tmux :switch-client :t target))
