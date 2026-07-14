@@ -1,0 +1,27 @@
+#!/usr/bin/env python
+# vim: set filetype=python:
+
+import ast
+import json
+import sys
+
+
+def dict_to_ast(node):
+    if isinstance(node, dict):
+        node_type = node['_type']
+        cls = getattr(ast, node_type)
+        instance = cls()
+        for field, value in node.items():
+            if field == '_type':
+                continue
+            setattr(instance, field, dict_to_ast(value))
+        return instance
+    if isinstance(node, list):
+        return [dict_to_ast(item) for item in node]
+    return node
+
+
+if __name__ == "__main__":
+    tree = dict_to_ast(json.loads(sys.stdin.read()))
+    ast.fix_missing_locations(tree)
+    print(ast.unparse(tree))
