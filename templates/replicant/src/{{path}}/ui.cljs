@@ -1,4 +1,9 @@
-(ns {{name}}.ui)
+(ns {{name}}.ui
+  (:require [replicant.alias :refer [defalias]]
+            [{{name}}.components :as c]))
 
 (defn main [state]
-  [:h1 "{{title}}"])
+  [:div
+   [:main
+    [:div.container
+     [:h1 "{{title}}"]]]])

@@ -1,8 +1,14 @@
 {:paths ["src" "test" "dev" "resources"]
- :deps {no.cjohansen/nexus {:mvn/version "2025.11.1"}
+ :deps {com.cognitect/transit-cljs {:mvn/version "0.8.280"}
+        com.widdindustries/cljc.java-time {:mvn/version "0.1.21"}
+        datascript/datascript {:mvn/version "1.7.8"}
+        no.cjohansen/dataspex {:mvn/version "2026.06.3"}
+        no.cjohansen/m1p {:mvn/version "2026.07.1"}
+        no.cjohansen/nexus {:mvn/version "2026.07.1"}
         no.cjohansen/replicant {:mvn/version "2025.12.1"}
         org.clojure/clojure {:mvn/version "1.12.0"}
-        org.exupero/polymath {:git/url "https://github.com/exupero/polymath.git" :git/sha "efd64b96c6d1d16cf226e7df7587160da1fc44db"}
+        org.clojure/clojurescript {:mvn/version "1.12.145"}
+        org.exupero/polymath {:git/url "https://github.com/exupero/polymath.git" :git/sha "d65bb0f9d3a5677f4de51c808501710b4bb5a708"}
         thheller/shadow-cljs {:mvn/version "3.3.8"}}
  :aliases {:dev {:extra-paths ["portfolio/src"]
                  :extra-deps {no.cjohansen/portfolio {:mvn/version "2026.03.1"}}}

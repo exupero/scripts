@@ -1,3 +1,7 @@
 (ns {{name}}.db)
 
-(defonce store (atom {}))
+(def initial-state
+  {})
+
+(defonce store
+  (atom {}))
