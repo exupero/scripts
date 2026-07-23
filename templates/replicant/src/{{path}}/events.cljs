@@ -9,13 +9,15 @@
   {:id :log-errors
    :after-action (fn [{:keys [errors] :as ctx}]
                    (when (seq errors)
-                     (js/console.error "⚠️ Error expanding action")
-                     (prn errors))
+                     (js/console.error "⚠️ Error expanding action:" (pr-str errors))
+                     (doseq [{:keys [err]} errors]
+                       (js/console.error err)))
                    ctx)
    :after-effect (fn [{:keys [errors] :as ctx}]
                    (when (seq errors)
-                     (js/console.error "⚠️ Error executing effect")
-                     (prn errors))
+                     (js/console.error "⚠️ Error executing effect:" (pr-str errors))
+                     (doseq [{:keys [err]} errors]
+                       (js/console.error err)))
                    ctx)})
 
 (nxr/register-placeholder! :event.target/value

@@ -10,7 +10,6 @@
 (defonce el (js/document.getElementById "app"))
 
 (defn ^:dev/after-load render []
-  (r/render el ({{name}}.ui/main @{{name}}.db/store))
   (let [state @{{name}}.db/store]
     (r/render el ({{name}}.ui/main state)
               {:alias-data {:dictionaries {{name}}.i18n/dictionaries
