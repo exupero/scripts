@@ -19,10 +19,11 @@ jobs:
       with:
         distribution: 'zulu'
         java-version: '21'
-    - name: Install clojure tools
+    - name: Install Clojure tools
       uses: DeLaGuardo/setup-clojure@13.6.0
       with:
         cli: latest
+        bb: 1.12.218
     - name: Install deps
       run: npm install
     - name: Build release

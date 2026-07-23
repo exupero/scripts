@@ -14,4 +14,9 @@
            :modules {:scenes {:init-fn portfolio/main}}
            :output-dir "portfolio/resources/public/js"
            :asset-path "/js"
-           :devtools {:watch-dir "resources/public"}}}}
+           :devtools {:watch-dir "resources/public"}}
+
+          :test
+          {:target :node-test
+           :output-to "out/tests.js"
+           :ns-regexp "^.*-test$"}}}

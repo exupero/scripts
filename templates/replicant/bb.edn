@@ -1,4 +1,15 @@
 {:paths ["bb"]
- :tasks {server (apply shell "npx shadow-cljs server" *command-line-args*)
-         test (apply shell "npx shadow-cljs compile test --config-merge '{:autorun true}'" *command-line-args*)
+ :tasks {:requires (build)
+         release:build (do
+                         (shell "npx shadow-cljs release app")
+                         (build/index))
+         server (apply shell "npx shadow-cljs server" *command-line-args*)
+         test (do
+                (shell "rm -rf .shadow-cljs")
+                (apply shell "npx shadow-cljs compile test" *command-line-args*)
+                (shell "node out/tests.js"))
+         test:watch (do
+                      (shell "rm -rf .shadow-cljs")
+                      (apply shell "npx shadow-cljs watch test -A dev:local --config-merge '{:autorun true :devtools {:preloads [pjstadig.humane-test-output]}}'"
+                             *command-line-args*))
          watch (apply shell "npx shadow-cljs watch app portfolio -A dev:local" *command-line-args*)}}

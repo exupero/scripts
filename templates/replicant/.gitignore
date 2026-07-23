@@ -1,4 +1,4 @@
-.shadow-cljs
-resources/public/js
-portfolio/resources/public/js
-!resources/public/js/app.js
+/.shadow-cljs
+/resources/public/js
+/portfolio/resources/public/js
+/out
