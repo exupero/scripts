@@ -1,5 +1,6 @@
 (ns {{name}}.app
   (:require [dataspex.core :as dataspex]
+            goog
             [nexus.registry :as nxr]
             [replicant.dom :as r]
             {{name}}.db
@@ -18,7 +19,9 @@
 (defn init []
   (nxr/register-system->state! deref)
   (r/set-dispatch! #(nxr/dispatch {{name}}.db/store %1 %2))
-  (dataspex/inspect "{{title}}" {{name}}.db/store)
+  (when ^boolean goog/DEBUG
+    (dataspex/inspect "{{title}}" {{name}}.db/store)
+    (dataspex/inspect-taps))
   (nxr/dispatch {{name}}.db/store nil [[:effect/init]])
   (render)
   (add-watch {{name}}.db/store ::render

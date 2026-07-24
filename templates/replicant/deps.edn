@@ -11,6 +11,7 @@
         org.exupero/polymath {:git/url "https://github.com/exupero/polymath.git" :git/sha "d65bb0f9d3a5677f4de51c808501710b4bb5a708"}
         thheller/shadow-cljs {:mvn/version "3.3.8"}}
  :aliases {:dev {:extra-paths ["portfolio/src"]
-                 :extra-deps {no.cjohansen/portfolio {:mvn/version "2026.03.1"}
+                 :extra-deps {no.cjohansen/lookup {:mvn/version "2026.07.1"}
+                              no.cjohansen/portfolio {:mvn/version "2026.03.1"}
                               pjstadig/humane-test-output {:mvn/version "0.11.0"}}}
            :local {:override-deps {org.exupero/polymath {:local/root "../polymath"}}}}}
