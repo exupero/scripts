@@ -1,0 +1,14 @@
+#!/usr/bin/env bb
+
+(ns bb-edn-classpath
+  (:require [clojure.java.io :as io]
+            [clojure.string :as str]))
+
+(when (.exists (io/file "bb.edn"))
+  (let [pwd (System/getProperty "user.dir")]
+    (->> (slurp "bb.edn")
+         read-string
+         :paths
+         (map (partial str pwd "/"))
+         (str/join ":")
+         print)))
