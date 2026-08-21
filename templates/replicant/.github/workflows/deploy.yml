@@ -27,7 +27,7 @@ jobs:
     - name: Install deps
       run: npm install
     - name: Build release
-      run: npx shadow-cljs release app
+      run: bb release:build
     - name: Deploy
       uses: JamesIves/github-pages-deploy-action@v4
       with:

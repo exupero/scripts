@@ -1,0 +1,139 @@
+#!/usr/bin/env python3
+# vim: set ft=python:
+"""
+repetition_finder.py
+
+Finds words you overuse in your writing, weighted by how rare those
+words normally are in English -- so "said" repeating 200 times doesn't
+drown out "luminous" repeating 12 times. Lemmatizes (so "glimmer" /
+"glimmers" / "glimmering" count together) and excludes proper nouns
+(character names, places) so they don't crowd out real word-choice tics.
+
+Usage:
+    python repetition_finder.py manuscript.txt
+    python repetition_finder.py manuscript.txt --top 40 --min-count 3
+
+Recommended (lemmatization + proper-noun detection via real POS tagging):
+    pip install spacy wordfreq
+    python -m spacy download en_core_web_sm
+
+Without spacy installed, the script still runs using a lighter fallback
+(simple lemmatization skipped; proper nouns guessed via capitalization).
+"""
+import argparse
+import re
+from collections import Counter
+
+STOPWORDS = set("""
+a an the and or but if then else for nor so yet of to in on at by
+with from as is are was were be been being do does did have has had
+this that these those it its it's i you he she we they them him her
+his hers our your their what which who whom will would shall should
+can could may might must not no yes just very really quite about
+into over under again further once here there when where why how all
+any both each few more most other some such only own same than too
+up down out off above below between through during before after said
+""".split())
+
+
+def tokenize(text):
+    return re.findall(r"[A-Za-z']+", text.lower())
+
+
+def guess_proper_nouns(text):
+    """Fallback heuristic when spaCy isn't installed: a word that
+    appears capitalized somewhere NOT at the start of a sentence is
+    probably a name."""
+    proper = set()
+    sentences = re.split(r"(?<=[.!?])\s+", text)
+    for sent in sentences:
+        tokens = re.findall(r"[A-Za-z']+", sent)
+        for i, tok in enumerate(tokens):
+            if i == 0:
+                continue
+            if tok[0].isupper():
+                proper.add(tok.lower())
+    return proper
+
+
+def score_and_print(counts, top):
+    try:
+        from wordfreq import zipf_frequency
+    except ImportError:
+        print("(install `wordfreq` for rarity-aware ranking: pip install wordfreq)\n")
+        print(f"{'word':<20}count")
+        for w, c in counts.most_common(top):
+            print(f"{w:<20}{c}")
+        return
+
+    scored = []
+    for w, c in counts.items():
+        z = zipf_frequency(w, "en")
+        if z > 4.3:  # still a common word even if not in our stoplist
+            continue
+        surprise = c / (10 ** (z - 4.3))
+        scored.append((surprise, c, z, w))
+    scored.sort(reverse=True)
+
+    print(f"{'word':<20}{'count':<8}{'zipf':<8}surprise")
+    for surprise, c, z, w in scored[:top]:
+        print(f"{w:<20}{c:<8}{z:<8.2f}{surprise:.1f}")
+
+
+def run_with_spacy(text, args):
+    import spacy
+    nlp = spacy.load("en_core_web_sm", disable=["ner", "parser"])
+    nlp.max_length = max(nlp.max_length, len(text) + 1000)
+
+    counts = Counter()
+    for doc in nlp.pipe([text], batch_size=1):
+        for tok in doc:
+            if not tok.is_alpha:
+                continue
+            if tok.pos_ in ("PROPN", "NUM", "SYM", "X"):
+                continue
+            if tok.is_stop or tok.lemma_.lower() in STOPWORDS:
+                continue
+            lemma = tok.lemma_.lower()
+            if len(lemma) < args.min_len:
+                continue
+            counts[lemma] += 1
+
+    counts = Counter({w: c for w, c in counts.items() if c >= args.min_count})
+    score_and_print(counts, args.top)
+
+
+def run_without_spacy(text, args):
+    proper_nouns = guess_proper_nouns(text)
+    words = tokenize(text)
+    counts = Counter(
+        w for w in words
+        if w not in STOPWORDS
+        and w not in proper_nouns
+        and len(w) >= args.min_len
+    )
+    counts = Counter({w: c for w, c in counts.items() if c >= args.min_count})
+    print("(install spacy for lemmatization + accurate name detection: "
+          "pip install spacy && python -m spacy download en_core_web_sm)\n")
+    score_and_print(counts, args.top)
+
+
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("file")
+    ap.add_argument("--top", type=int, default=30, help="how many words to show")
+    ap.add_argument("--min-len", type=int, default=2, help="ignore words shorter than this")
+    ap.add_argument("--min-count", type=int, default=2, help="ignore words used fewer times than this")
+    args = ap.parse_args()
+
+    text = open(args.file, encoding="utf-8").read()
+
+    try:
+        import spacy  # noqa: F401
+        run_with_spacy(text, args)
+    except ImportError:
+        run_without_spacy(text, args)
+
+
+if __name__ == "__main__":
+    main()

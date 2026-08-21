@@ -1,4 +1,5 @@
 #!/usr/bin/env bb
+; vim: set ft=clojure:
 
 (ns template
   (:require [clojure.java.io :as io]
@@ -8,11 +9,11 @@
 
 (defn find-template-dir [roots nm]
   (first
-    (sequence
-      (comp
-        (map #(io/file % nm))
-        (filter #(.exists %)))
-      roots)))
+   (sequence
+    (comp
+     (map #(io/file % nm))
+     (filter #(.exists %)))
+    roots)))
 
 (def cli-opts
   [["-f" "--field NAME=VALUE" "A name and value to include when rendering templates; repeatable"
@@ -49,6 +50,9 @@
                           (selmer/render context))]
         (if (.isDirectory file)
           (.mkdirs (io/file dest-path))
-          (spit dest-path
-            (-> (slurp file)
-                (selmer/render context))))))))
+          (try
+            (spit dest-path
+                  (-> (slurp file)
+                      (selmer/render context)))
+            (catch Exception e
+              (throw (ex-info "Could not render file" {:file file :exception e})))))))))
