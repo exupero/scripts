@@ -6,11 +6,11 @@
 (defn frontmatter-text [s]
   (when (= "---" (subs s 0 3))
     (transduce
-      (comp
-        (drop 1)
-        (take-while (complement #{"---"}))
-        (interpose "\n"))
-      str (str/split-lines s))))
+     (comp
+      (drop 1)
+      (take-while (complement #{"---"}))
+      (interpose "\n"))
+     str (str/split-lines s))))
 
 (defn frontmatter [s]
   (when (and (pos? (count s))
@@ -35,12 +35,12 @@
 (defn remove-frontmatter [s]
   (if (= "---" (subs s 0 3))
     (transduce
-      (comp
-        (drop 1)
-        (drop-while (complement #{"---"}))
-        (drop 1)
-        (interpose "\n"))
-      str (str/split-lines s))
+     (comp
+      (drop 1)
+      (drop-while (complement #{"---"}))
+      (drop 1)
+      (interpose "\n"))
+     str (str/split-lines s))
     s))
 
 (defn content [file]
@@ -48,28 +48,47 @@
 
 (defn update-frontmatter-text [file f & args]
   (text/update-file file
-    (fn [content]
-      (let [[fm-text content] (frontmatter-text+content content)]
-        (str "---\n"
-             (apply f fm-text args)
-             "\n---\n"
-             content)))))
+                    (fn [content]
+                      (let [[fm-text content] (frontmatter-text+content content)]
+                        (str "---\n"
+                             (apply f fm-text args)
+                             "\n---\n"
+                             content)))))
 
 (defn update-frontmatter [file f & args]
   (text/update-file file
-    (fn [content]
-      (let [[fm content] (frontmatter+content content)]
-        (str "---\n"
-             (yaml/generate-string (apply f fm args) :dumper-options {:flow-style :block})
-             "---\n"
-             content)))))
+                    (fn [content]
+                      (let [[fm content] (frontmatter+content content)]
+                        (str "---\n"
+                             (yaml/generate-string (apply f fm args) :dumper-options {:flow-style :block})
+                             "---\n"
+                             content)))))
 
 (defn update-content [file f & args]
   (text/update-file file
-    (fn [content]
-      (let [[fm content] (frontmatter-text+content content)]
-        (str "---\n"
-             fm
-             "\n---\n\n"
-             (-> (apply f content args)
-                 (str/replace #"\r" "")))))))
+                    (fn [content]
+                      (let [[fm content] (frontmatter-text+content content)]
+                        (str "---\n"
+                             fm
+                             "\n---\n\n"
+                             (-> (apply f content args)
+                                 (str/replace #"\r" "")))))))
+
+(defn without-comments [content]
+  (str/replace content #"(?s)%%(.*?)%%" ""))
+
+(defn without-code-blocks [content]
+  (->> content
+       str/split-lines
+       (reduce (fn [{:keys [inside?] :as info} line]
+                 (if (str/starts-with? line "```")
+                   (update info :inside? not)
+                   (if inside?
+                     info
+                     (update info :lines conj line))))
+               {:inside? false :lines []})
+       :lines
+       (str/join "\n")))
+
+(defn without-markers [content]
+  (str/replace content #"\^[A-Za-z0-9-]+" ""))
