@@ -74,10 +74,10 @@
                              (-> (apply f content args)
                                  (str/replace #"\r" "")))))))
 
-(defn without-comments [content]
+(defn remove-comments [content]
   (str/replace content #"(?s)%%(.*?)%%" ""))
 
-(defn without-code-blocks [content]
+(defn remove-code-blocks [content]
   (->> content
        str/split-lines
        (reduce (fn [{:keys [inside?] :as info} line]
@@ -90,5 +90,5 @@
        :lines
        (str/join "\n")))
 
-(defn without-markers [content]
+(defn remove-markers [content]
   (str/replace content #"\^[A-Za-z0-9-]+" ""))
